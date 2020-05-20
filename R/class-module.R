@@ -1,5 +1,6 @@
 # definition of modules and module repo
 
+rave_package_data_repository <- dipsaus::fastmap2()
 rave_loaded_modules <- dipsaus::fastmap2()
 
 loaded_rave_module <- function(module_id){
@@ -11,7 +12,7 @@ RAVEModule <- R6::R6Class(
   classname = 'RAVEModule',
   portable = FALSE,
   cloneable = FALSE,
-  parent_env = .GlobalEnv,
+  parent_env = asNamespace('ravecore'),
   lock_objects = FALSE, # FIXME
   public = list(
     debug = FALSE,
@@ -24,7 +25,7 @@ RAVEModule <- R6::R6Class(
     module_id = character(0),
     module_label = character(0),
     module_group = character(0),
-    module_data = NULL,
+    package_data = NULL,
 
     # stores execenv instances
     containers = NULL,
@@ -36,19 +37,19 @@ RAVEModule <- R6::R6Class(
       self$package_env <- asNamespace(package)
       self$debug <- debug
 
-      if(is.null(rave_loaded_modules[[module_id]])){
-        self$module_data = dipsaus::fastmap2()
-        self$containers = dipsaus::fastmap2()
-        rave_loaded_modules[[module_id]] <- self
-      } else {
+      if(!is.null(rave_loaded_modules[[module_id]])){
         if(!force){
           raveutils::rave_error("Trying to create a new module that has been loaded: {module_id}")
         }
         old_module <- rave_loaded_modules[[module_id]]
-        self$module_data <- old_module$module_data
         self$containers <- old_module$containers
         rave_loaded_modules[[module_id]] <- self
+      } else {
+        rave_loaded_modules[[module_id]] <- self
       }
+      rave_package_data_repository[[module_id]] %?<-% dipsaus::fastmap2()
+      self$package_data = rave_package_data_repository[[module_id]]
+      self$containers %?<-% dipsaus::fastmap2()
 
 
       # self$analyze_module()

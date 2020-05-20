@@ -153,18 +153,20 @@ rave_dash_header <- function (
               id = "rave_nav_sidebar",
               `data-toggle` = "offcanvas",
               role = "button", shiny::span(class = "sr-only", "Toggle navigation"),
-              shiny::icon('th'),
-              shiny::span('Switch Dataset')
+              shiny::icon('th')
+              # shiny::span('Switch Dataset')
               # shiny::textOutput('..rave_data_nav..', inline = TRUE),
               # `hover-text` = 'Change Loaded Data'
             )
           ),
           shiny::tags$li(
-            shiny::a(href = "#", class = "nav-item nav-link force-recalculate",
-                     `data-toggle` = "rave-toggle-inputs",
-                     role = "button", shiny::span(class = "sr-only", "Toggle input panel"),
-                     shiny::icon('keyboard-o'), shiny::span('Input Panels')
-            )
+            # shiny::a(href = "#", class = "nav-item nav-link force-recalculate",
+            #          `data-toggle` = "rave-toggle-inputs",
+            #          role = "button", shiny::span(class = "sr-only", "Toggle input panel"),
+            #          shiny::icon('keyboard-o'), shiny::span('Input Panels')
+            # )
+            shiny::actionLink("data_select", "Select Data",
+            icon = shiny::icon("tasks"), role = "button", class = "nav-item nav-link")
           ),
           ...
         )

@@ -25,6 +25,7 @@ RAVERepository <- R6::R6Class(
     ignored_electrodes = NULL,
     reference_table = NULL,
     time_range = c(NA_real_, NA_real_),
+    reference_name = character(0),
     epoch = NULL,
     initialize = function(subject, reference, epoch, before_onset, after_onset){
       stopifnot2(before_onset >= 0, after_onset >= 0, msg = 'Both before_onset and after_onset must be non-negative')
@@ -33,10 +34,11 @@ RAVERepository <- R6::R6Class(
       subject = as_rave_subject(subject)
       self$subject = subject
 
-      stopifnot2(isTRUE(reference %in% subject$reference_names), msg = sprintf('Reference %s is missing', reference))
       epoch = RAVEEpoch$new(subject = subject, name = epoch)
       self$epoch = epoch
 
+      stopifnot2(isTRUE(reference %in% subject$reference_names), msg = sprintf('Reference %s is missing', reference))
+      self$reference_name = reference
       reference_table = subject$meta_data(meta_type = 'reference', meta_name = reference)
       self$reference_table = reference_table
       self$ignored_electrodes = reference_table$Electrode[reference_table$Reference == '']
@@ -107,9 +109,7 @@ RAVERepository <- R6::R6Class(
       after_onset = self$time_range[[2]]
       dipsaus::make_forked_clusters(rave_options('max_worker'))
 
-      lapply(electrodes, function(e){
-        self$electrodes[[as.character(e)]]$clear_memory()
-      })
+      self$clear_memory()
 
       re <- dipsaus::lapply_async2(electrodes, function(e){
         self$electrodes[[as.character(e)]]$epoch_power(

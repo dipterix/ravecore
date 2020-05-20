@@ -45,6 +45,21 @@ load_scripts.rave_compile <- function(..., asis = TRUE){
 }
 
 #' @export
+load_scripts.rave_module_debug <- function(..., asis = TRUE){
+  parent_env <- parent.frame()
+  fs = c(...)
+  fs = sapply(fs, function(x){
+    if(rlang::is_quosure(x)){
+      dipsaus::eval_dirty(x, parent_env)
+    }else{
+      source(raveutils::find_path(x, '.'), local = parent_env)
+    }
+  })
+}
+
+
+
+#' @export
 define_initialization <- raveutils::rave_context_generics(
   fun_name = 'define_initialization', alist(expr=))
 
@@ -58,4 +73,10 @@ define_initialization.rave_compile <- function(expr){
   instance <- ctx$instance
   instance$init_script[[length(instance$init_script) + 1]] <- expr
   invisible()
+}
+
+#' @export
+define_initialization.rave_module_debug <- function(expr){
+  expr = substitute(expr)
+  eval(expr, envir = .GlobalEnv)
 }

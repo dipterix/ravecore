@@ -27,6 +27,9 @@ RAVEContainer <- R6::R6Class(
     mask_env = NULL,
     runtime_env = NULL,
 
+    # observers
+    user_observers = NULL,
+
     # scripts/components
     dynamic_script = list(), # loaded via "load_script"
     init_script = list(),
@@ -34,26 +37,32 @@ RAVEContainer <- R6::R6Class(
     input_layout = list(),
     output_components = list(),
     output_layout = list(),
-    main_functions = NULL,
+    main_functions = list(),
+    .data_validation = NULL,  # stores validation expression
     has_data = FALSE,
-    auto_run = TRUE,
+    auto_run = Inf,
 
     container_data = NULL,
 
     open_data_selector = function(session = shiny::getDefaultReactiveDomain()){
-      session$sendCustomMessage(type = 'rave_remove_class',message = list(
-        selector = 'body',
-        class = 'sidebar-collapse'
+      raveutils::rave_debug('Opening data selector')
+      session$sendCustomMessage(type = 'rave_add_class',message = list(
+        selector = sprintf('.rave-module-container[rave-module="%s"]', self$module_id),
+        class = 'open'
       ))
       # trigger input change
       dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
-                               value = Sys.time(), priority = 'immediate')
+                               value = Sys.time(), priority = 'event')
     },
 
     close_data_selector = function(session = shiny::getDefaultReactiveDomain()){
-      session$sendCustomMessage(type = 'rave_add_class',message = list(
-        selector = 'body',
-        class = 'sidebar-collapse'
+      # session$sendCustomMessage(type = 'rave_add_class',message = list(
+      #   selector = 'body',
+      #   class = 'sidebar-collapse'
+      # ))
+      session$sendCustomMessage(type = 'rave_remove_class',message = list(
+        selector = sprintf('.rave-module-container[rave-module="%s"]', self$module_id),
+        class = 'open'
       ))
     },
 
@@ -67,10 +76,11 @@ RAVEContainer <- R6::R6Class(
       private$error_list <- list()
       if(is.function(private$check_fun)){
         withCallingHandlers({
-          private$check_fun(self$container_data, self$module$module_data, getDefaultDataRepository())
+          private$check_fun(self$container_data, self$module$package_data, getDefaultDataRepository())
         }, rave_check_error = function(e){
           # only captures rave_check_error
           private$error_list[[e$message]] <- e
+          raveutils::rave_info('[Module Validation]: {e$message}')
         }, error = function(e){
           raveutils::rave_error("Captured unknown error: {e$message} in call:")
           traceback(e)
@@ -78,9 +88,10 @@ RAVEContainer <- R6::R6Class(
         })
       }
       if(length(private$error_list)){
-        self$has_data = FALSE
+        raveutils::rave_debug('{self$module_label} needs to load more data...')
+        self$`@set_data_status`(FALSE)
       } else {
-        self$has_data = TRUE
+        self$`@set_data_status`(TRUE)
       }
 
       list(check_list = self$container_data, error_list = private$error_list)
@@ -104,12 +115,7 @@ RAVEContainer <- R6::R6Class(
       if(!is.function(private$loader_interface)){
         return()
       }
-      private$loader_info <- tryCatch({
-        private$loader_interface(self$container_data, self$module$module_data, getDefaultDataRepository())
-      }, error = function(e){
-        raveutils::rave_error("Captured error: {e$message} in call:")
-        traceback(e)
-      })
+      remove_observers(private$observer_list)
 
       # If rave_running
       private$sneaky_observeEvent({
@@ -127,23 +133,29 @@ RAVEContainer <- R6::R6Class(
         on.exit({
           dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = FALSE)
         })
-        raveutils::rave_debug("Loading start...")
+        raveutils::rave_info("Loading start...")
 
-        private$onload_action(self$container_data, self$module$module_data, getDefaultDataRepository())
-        # REMOVE all observers!!!
-        remove_observers(private$observer_list)
+        tryCatch({
+          private$onload_action(self$container_data, self$module$package_data, getDefaultDataRepository())
+          # REMOVE all observers!!!
+          remove_observers(private$observer_list)
 
-        self$has_data = TRUE
-        self$last_loaded = Sys.time()
-        dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
+          self$`@set_data_status`(TRUE)
+          self$last_loaded = Sys.time()
+          dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
 
-        self$close_data_selector()
+          self$close_data_selector()
+        }, error = function(e){
+          raveutils::rave_error(e$message)
+          raveutils::rave_debug('[Module ERROR] Failures while loading data')
+          base::print(private$onload_action)
+        })
 
 
       }, ignoreInit = TRUE)
 
       # open loader panel
-      self$open_data_selector()
+      # self$open_data_selector()
 
     },
     register_onload_action = function(onload, variables = NULL){
@@ -178,6 +190,11 @@ RAVEContainer <- R6::R6Class(
       private$sneaky_observe = make_observe(private$observer_list)
       private$sneaky_observeEvent = make_observeEvent(private$observer_list)
 
+      # to control the custom observers
+      self$user_observers = dipsaus::fastmap2()
+      self$mask_env$observe = make_observe(self$user_observers, on_invalidate = self$`@invalidate`)
+      self$mask_env$observeEvent = make_observeEvent(self$user_observers, on_invalidate = self$`@invalidate`)
+
     },
 
     with_context = function(context, expr, envir = parent.frame(), quoted = FALSE, ...){
@@ -201,10 +218,16 @@ RAVEContainer <- R6::R6Class(
 
     import_widgets = function(context = 'rave_compile'){
       self$with_context(context, {
-        widgets <- list.files(self$module$get_path(file.path('modules', 'tools')), full.names = TRUE, pattern = "\\.[rR]$")
+        widgets <- list.files(self$module$get_path(file.path('tools')), full.names = TRUE, pattern = "\\.[rR]$")
         # load widgets to runtime_env and move to wrapper_env
         for(wf in widgets){
-          source(file = wf, local = self$runtime_env)
+          tryCatch({
+            source(file = wf, local = self$runtime_env)
+          }, error = function(e){
+            cat(wf, '\n')
+            traceback(e)
+            rave_fatal(e$message)
+          })
         }
         list2env(as.list(self$runtime_env), envir = self$wrapper_env)
         raveutils::clear_env(self$runtime_env)
@@ -213,6 +236,17 @@ RAVEContainer <- R6::R6Class(
 
     parse_module = function(context = 'rave_compile'){
       self$with_context(context, {
+
+        # initialize
+        self$dynamic_script = list()
+        self$init_script = list()
+        self$input_components = list()
+        self$input_layout = list()
+        self$output_components = list()
+        self$output_layout = list()
+        self$main_functions = list()
+
+
         comp_script = self$module$get_path(file.path('modules', self$module_id, 'comp.R'))
 
         # read in comp.R
@@ -231,13 +265,29 @@ RAVEContainer <- R6::R6Class(
         self$input_layout = self$runtime_env$input_layout
         self$output_layout = self$runtime_env$output_layout
 
+        # To be compatible with old design
+        render_inputs = unlist(self$runtime_env$render_inputs)
+        manual_inputs = unlist(self$runtime_env$render_inputs)
+
         # Register monitoring inputs
         lapply(self$input_components, function(comp){
+          # list(
+          #   generator = dipsaus::new_function2(body = { !!call }, env = ctx$instance$wrapper_env),
+          #   hook = update_hook,
+          #   update_level = update_level,
+          #   input_id = input_id
+          # )
+          if(comp$input_id %in% manual_inputs){
+            comp$update_level = UPDATE_LEVEL$manual
+            self$input_components[[comp$input_id]] <- comp
+          } else if(comp$input_id %in% render_inputs){
+            comp$update_level = UPDATE_LEVEL$render_only
+            self$input_components[[comp$input_id]] <- comp
+          }
           self$input_update_levels[[comp$input_id]] = comp$update_level
         })
 
         # main.R
-        self$main_functions = list()
         main_script = self$module$get_path(file.path('modules', self$module_id, 'main.R'))
 
         # read in main.R
@@ -262,16 +312,17 @@ RAVEContainer <- R6::R6Class(
           section_header = which(section_line)
           overhead = stringr::str_trim(script[seq_len(section_header[[1]] - 1)])
           if(!all(stringr::str_detect(overhead, '^#') || overhead == '')){
-            raveutils::rave_warn("There is overhead in main.R which will be ignored. Reasons:\n",
-                                 "  You want to partition main.R using #' @section flags. ",
-                                 "But you must comment any code before the first flag and starting anchor. \n",
-                                 "(One valid example)\n\n",
-                                 "# >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------\n",
-                                 "#' @section This is section 1\n\n",
-                                 "(One invalid example)\n\n",
-                                 "# >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------\n",
-                                 "...Some R script not commented...\n",
-                                 "#' @section This is section 1\n")
+            raveutils::rave_warn(
+              "There is overhead in main.R which will be ignored. Reasons:\n",
+              "  You want to partition main.R using #' @section flags. ",
+              "But you must comment any code before the first flag and starting anchor. \n",
+              "(One valid example)\n\n",
+              "# >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------\n",
+              "#' @section This is section 1\n\n",
+              "(One invalid example)\n\n",
+              "# >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------\n",
+              "...Some R script not commented...\n",
+              "#' @section This is section 1\n")
           }
           for(ii in seq_along(section_header)){
             start = section_header[[ii]]
@@ -293,13 +344,12 @@ RAVEContainer <- R6::R6Class(
             }
             section_code = c('{', section_code, '}')
             expr <- parse(text = section_code)
-            self$main_functions = append(self$main_functions, values = list(
-              list(
-                section = section_name,
-                include = includes, # Any input change will result in recalculation
-                expr = expr[[1]]
-              )
-            ), after = TRUE)
+            self$main_functions[[ length(self$main_functions) + 1 ]] = list(
+              section = section_name,
+              include = includes, # Any input change will result in recalculation
+              expr = expr[[1]],
+              order = ii
+            )
           }
 
         }
@@ -318,10 +368,17 @@ RAVEContainer <- R6::R6Class(
           session = session$rootScope()$makeScope(module_id)
         }
 
-        self$mask_env$session = session
-        self$mask_env$input = session$input
-        self$mask_env$output = session$output
-        self$mask_env$local_data = shiny::reactiveValues()
+        self$wrapper_env$session = session
+        self$wrapper_env$input = session$input
+        self$wrapper_env$output = session$output
+        self$wrapper_env$reactive_data = shiny::reactiveValues()
+        self$wrapper_env$ns = shiny::NS(self$module_id)
+
+        self$wrapper_env$package_data = self$module$package_data
+        self$wrapper_env$session_data = self$container_data
+        makeActiveBinding('global_data', function(){
+          getDefaultDataRepository()
+        }, self$wrapper_env)
       }
 
 
@@ -332,8 +389,9 @@ RAVEContainer <- R6::R6Class(
     # Need isolate
     `@run` = function(all = FALSE){
       module_label = self$module$module_label
-      tmp_env <- new.env(parent = self$mask_env)
+      tmp_env <- new.env(parent = self$runtime_env)
       ran = FALSE
+      init_time <- Sys.time()
 
       for(ii in seq_along(self$main_functions)){
         start_time <- Sys.time()
@@ -345,7 +403,7 @@ RAVEContainer <- R6::R6Class(
           digest = lapply(main_f$include, function(lang){
             digest::digest(tryCatch({
               re = eval(lang, envir = tmp_env)
-              base::print(re)
+              # base::print(re)
               re
             }, error = function(e){
               raveutils::rave_debug('Error while digesting {lang}')
@@ -358,7 +416,7 @@ RAVEContainer <- R6::R6Class(
           if(!all && !ran && isTRUE(self$main_digests[[ii]] == digest)){
             # This part should be skipped
             timer = structure(dipsaus::time_delta(start_time, Sys.time()), unit = 's', class = 'rave-units')
-            raveutils::rave_debug('[{module_label}]: {main_f$section} - no changes found, skipping... ({timer})')
+            raveutils::rave_debug('[{module_label}]: Part {ii}: {main_f$section} - no changes found, skipping... ({timer})')
             next()
           } else {
             self$main_digests[[ii]] = digest
@@ -370,17 +428,29 @@ RAVEContainer <- R6::R6Class(
         tryCatch({
           dipsaus::eval_dirty(main_f$expr, env = self$runtime_env)
         }, error = function(e){
-          rave_warn("Please check the following line:")
+          raveutils::rave_warn("Please check the following line:")
+          base::print(main_f$expr)
+
           base::print(e$call)
-          rave_debug("Traceback information:")
-          traceback(e)
-          raveutils::rave_error('[{module_label}]: Error found while running section {sQuote(main_f$section)}:\n',
-                                '  {e$message}\n', 'Please check the messages above for debugging information.')
+          raveutils::rave_fatal('[{module_label}]: Part {ii}: Error found in section {sQuote(main_f$section)}:\n',
+                                '  {e$message}\n', 'Please check the messages above for debugging information.',
+                                call = 'See above messages')
         })
         timer = structure(dipsaus::time_delta(start_time, Sys.time()), unit = 's', class = 'rave-units')
-        raveutils::rave_debug('[{module_label}]: {main_f$section} - finished ({timer})')
+        raveutils::rave_debug('[{module_label}]: Part {ii}: {main_f$section} - finished ({timer})')
+      }
+      timer = structure(dipsaus::time_delta(init_time, Sys.time()), unit = 's', class = 'rave-units')
+      raveutils::rave_debug('[{module_label}]: finished main.R in {timer}, start rendering')
+
+    },
+
+    `@invalidate` = function(...){
+      if(is.function(self$`@_invalidate`)){
+        self$`@_invalidate`(...)
       }
     },
+
+    `@_invalidate` = NULL,
 
     # UI
     `@sidebar_menu` = function(standalone = TRUE){
@@ -448,6 +518,11 @@ RAVEContainer <- R6::R6Class(
       output_layout$width <- NULL
       tagsets = names(output_layout)
       unlisted = self$output_ids[!self$output_ids %in% unlist(output_layout)]
+
+      if(!length(self$output_ids)){
+        return()
+      }
+
       get_ = function(p, default_tabset, default_unlisted){
         tagset_re = sapply(output_layout, function(comp){
           re <- comp[[p]]
@@ -531,6 +606,14 @@ RAVEContainer <- R6::R6Class(
 
     `@display_loader` = function(modal_info){
       if(missing(modal_info)){
+        private$loader_info <- tryCatch({
+          private$loader_interface(self$container_data,
+                                   self$module$package_data,
+                                   getDefaultDataRepository())
+        }, error = function(e){
+          raveutils::rave_error("Captured error: {e$message} in call:")
+          traceback(e)
+        })
         modal_info = private$loader_info
       }
 
@@ -543,7 +626,8 @@ RAVEContainer <- R6::R6Class(
       # est_loadsize <- modal_info$expectedloadingsize
       # est_loadsize %?<-% '(small)'
 
-      shinydashboard::menuItem(
+      # shinydashboard::menuItem(
+      shiny::tagList(
         text = title,
         modal_info$ui,
         shiny::hr(),
@@ -555,8 +639,8 @@ RAVEContainer <- R6::R6Class(
             ns('..rave_import_data_btn..'), "Load Data"),
           shiny::actionButton(
             ns('..rave_import_data_btn_cancel..'), "Previous Module")
-        ),
-        startExpanded = TRUE
+        )
+        # startExpanded = TRUE
       )
       # shiny::fluidRow(
       #   box(
@@ -578,6 +662,19 @@ RAVEContainer <- R6::R6Class(
 
     },
 
+    `@set_data_status` = function(has_data){
+      if(has_data){
+        lapply(names(self$user_observers), function(nm){
+          self$user_observers[[nm]]$resume()
+        })
+      } else {
+        lapply(names(self$user_observers), function(nm){
+          self$user_observers[[nm]]$suspend()
+        })
+      }
+      self$has_data = has_data
+    },
+
     ns = function(id = NULL){
       shiny::NS(self$module_id, id)
     }
@@ -589,6 +686,9 @@ RAVEContainer <- R6::R6Class(
     },
     module_id = function(){
       self$module$module_id
+    },
+    module_label = function(){
+      self$module$module_label
     },
     package_root = function(){
       self$module$package_root

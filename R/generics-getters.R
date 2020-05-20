@@ -35,7 +35,7 @@ getDefaultReactiveInput.rave_module_debug <- function(isolated = FALSE, ...){
   module = loaded_rave_module(module_id)
   new = TRUE
   if(!is.null(module)){
-    re = module$module_data$...debug_reactive_input...
+    re = module$package_data$...debug_reactive_input...
     if(!is.null(re)){
       new = FALSE
     }
@@ -57,7 +57,7 @@ getDefaultReactiveInput.rave_module_debug <- function(isolated = FALSE, ...){
     class(re) = c('fastmap2', 'list')
   }
   if(!is.null(module)){
-    module$module_data$...debug_reactive_input... = re
+    module$package_data$...debug_reactive_input... = re
   }
   re
 }
@@ -92,19 +92,27 @@ getDefaultReactiveOutput.rave_module_debug <- function(isolated = FALSE, ...){
 
 
 #' @export
-getDefaultModuleData <- raveutils::rave_context_generics('getDefaultModuleData')
+getDefaultPackageData <- raveutils::rave_context_generics('getDefaultPackageData')
 
 
-..getDefaultModuleData <- function(){
-  raveutils::from_rave_context('instance')$module$module_data
+..getDefaultPackageData <- function(){
+  raveutils::from_rave_context('instance')$module$package_data
 }
 
 #' @export
-getDefaultModuleData.rave_running <- ..getDefaultModuleData
+getDefaultPackageData.rave_running <- ..getDefaultPackageData
 #' @export
-getDefaultModuleData.rave_running_local <- ..getDefaultModuleData
+getDefaultPackageData.rave_running_local <- ..getDefaultPackageData
 #' @export
-getDefaultModuleData.rave_module_debug <- ..getDefaultModuleData
+getDefaultPackageData.rave_module_debug <- function(){
+  module_id <- raveutils::from_rave_context('module_id')
+  package <- raveutils::from_rave_context('package')
+  module <- loaded_rave_module(module_id)
+  if(!inherits(module, 'RAVEModule')){
+    module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
+  }
+  module$package_data
+}
 
 
 #' @export
@@ -119,10 +127,54 @@ getDefaultSessionData <- raveutils::rave_context_generics('getDefaultSessionData
 getDefaultSessionData.rave_running <- ..getDefaultSessionData
 #' @export
 getDefaultSessionData.rave_running_local <- ..getDefaultSessionData
+
+..debug_session_data <- dipsaus::fastmap2()
 #' @export
-getDefaultSessionData.rave_module_debug <- ..getDefaultSessionData
+getDefaultSessionData.rave_module_debug <- function(){
+  ..debug_session_data
+}
+
+#' @export
+getDefaultSessionData.rave_compile <- function(){
+  ..debug_session_data
+}
 
 
 
+#' @export
+fake_session <- function(rave_id = '__fake_session__', id = NULL){
+  self_id = id
+  fakesession = new.env()
 
+  shiny = asNamespace('shiny')
+  list2env(as.list(shiny$createMockDomain()), fakesession)
 
+  fakesession$sendInputMessage = function(inputId, message){
+    return(message)
+  }
+  fakesession$userData = new.env(parent = emptyenv())
+  fakesession$userData$rave_id = rave_id
+  fakesession$ns = shiny::NS(id)
+
+  fakesession$makeScope = function(id = NULL){
+    if( identical(self_id, id) ){
+      return(fakesession)
+    }else{
+      re = fake_session(rave_id = rave_id, id = id)
+      re$userData = fakesession$userData
+      return(re)
+    }
+  }
+
+  fakesession$rootScope = function(){
+    if(is.null(self_id)){
+      return(fakesession)
+    }else{
+      re = fake_session(rave_id = rave_id, id = NULL)
+      re$userData = fakesession$userData
+      return(re)
+    }
+  }
+
+  fakesession
+}

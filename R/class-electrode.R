@@ -468,9 +468,14 @@ LFP_electrode <- R6::R6Class(
           Time = tidx / power_srate,
           Electrode = self$subject$electrodes
         )
-        array = lazyarray::create_lazyarray(path = dir, storage_format = 'double', dim = dim,
-                                    dimnames = dimnames, multipart = TRUE, prefix = '',
-                                    compress_level = 0L, multipart_mode = 1L)
+        tryCatch({
+          lazyarray::create_lazyarray(path = dir, storage_format = 'double', dim = dim,
+                                      dimnames = dimnames, multipart = TRUE, prefix = '',
+                                      compress_level = 0L, multipart_mode = 1L)
+        }, error = function(e){
+          raveutils::rave_debug('Cache path already exists - {dir}')
+          lazyarray::load_lazyarray(path = dir, read_only = FALSE)
+        })
       }
       array = lazyarray::load_lazyarray(path = dir, read_only = FALSE)
       dim = dim(array)

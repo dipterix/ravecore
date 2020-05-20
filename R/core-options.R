@@ -112,8 +112,15 @@ rave_options <- function(..., .save = TRUE, launch_gui = TRUE,
 
 
 
+#' @export
+set_rave_theme <- function(...){
+  raveutils::rave_warn('set_rave_theme not implemented yet')
+}
 
-
+#' @export
+get_rave_theme <- function(...){
+  raveutils::rave_warn('get_rave_theme not implemented yet')
+}
 
 
 

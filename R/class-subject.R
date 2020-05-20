@@ -17,6 +17,13 @@ as_rave_project <- function(project){
 }
 
 #' @export
+get_projects <- function(){
+  projects <- list.dirs(rave_options('data_dir'), full.names = FALSE, recursive = FALSE)
+  projects <- projects[stringr::str_detect(projects, '^[a-zA-Z0-9]+')]
+  projects
+}
+
+#' @export
 RAVESubject <- R6::R6Class(
   classname = 'RAVESubject',
   class = TRUE,
@@ -27,7 +34,8 @@ RAVESubject <- R6::R6Class(
     .path = character(0),
     .project = NULL,
     .preprocess = NULL,
-    .cached_config = NULL
+    .cached_config = NULL,
+    .reference_tables = list()
 
   ),
   public = list(
@@ -62,10 +70,22 @@ RAVESubject <- R6::R6Class(
     meta_data = function(
       meta_type = c('electrodes', 'frequencies', 'time_points',
                     'epoch', 'references'),
-      meta_name = 'deafult'){
+      meta_name = 'default'){
       meta_type = match.arg(meta_type)
       load_meta(meta_type = meta_type, meta_name = meta_name,
                 project_name = self$project_name, subject_code = self$subject_code)
+    },
+
+    valid_electrodes = function(reference_name, refresh = FALSE){
+      if(refresh){
+        private$.reference_tables[[reference_name]] = self$meta_data(
+          meta_type = 'references', meta_name = reference_name)
+      } else {
+        private$.reference_tables[[reference_name]] %?<-% self$meta_data(
+          meta_type = 'references', meta_name = reference_name)
+      }
+      ref_table = private$.reference_tables[[reference_name]]
+      as.integer(ref_table$Electrode[ref_table$Reference != ''])
     }
 
   ),

@@ -1,33 +1,43 @@
 # creating observers, but keep track of the handlers
-make_observe <- function(map, error_handler = NULL){
+make_observe <- function(map, error_handler = NULL, on_invalidate = NULL, env = NULL){
   stopifnot(inherits(map, 'fastmap2'))
+
+  if(!is.environment(env)){
+    env <- quote(parent.frame())
+  }
 
   function(x, env = parent.frame(), quoted = FALSE, ..., label = rand_string(10)){
     if(!quoted){ x = substitute(x) }
     x = rlang::quo_squash(rlang::quo({
       tryCatch({ !!x }, error = function(e){
-        raveutils::rave_error("[RAVE ERROR] {e$message}")
         # TODO: Signal STOP command to session
-        if(is.function(error_handler)){
-          error_handler(e)
-        } else {
-          traceback(e)
-          raveutils::rave_debug("Event expression with error raised")
-          cat(!!deparse1(x), '\n')
-        }
+        local({
+          error_handler <- !!error_handler
+          if(is.function(error_handler)){
+            error_handler(e)
+          } else {
+            print(e$call)
+            raveutils::rave_debug("Event expression with error raised")
+            cat(!!deparse(x), sep = '\n')
+            raveutils::rave_error("[Module ERROR] {e$message}")
+          }
+        })
       })
     }))
     if(!length(label) || is.na(label)){
       label = rand_string(11)
     }
     map[[label]] <- shiny::observe(x = x, env = env, quoted = TRUE, ..., label = label)
+    if(is.function(on_invalidate)){
+      map[[label]]$onInvalidate(on_invalidate)
+    }
     invisible(map[[label]])
   }
 
 }
 
 
-make_observeEvent <- function(map, error_handler = NULL){
+make_observeEvent <- function(map, error_handler = NULL, on_invalidate = NULL){
   stopifnot(inherits(map, 'fastmap2'))
 
 
@@ -38,26 +48,33 @@ make_observeEvent <- function(map, error_handler = NULL){
     if( !handler.quoted ){ handlerExpr = substitute(handlerExpr) }
     eventExpr = rlang::quo_squash(rlang::quo({
       tryCatch({ !!eventExpr }, error = function(e){
-        raveutils::rave_error("[RAVE ERROR] {e$message}")
-        if(is.function(error_handler)){
-          error_handler(e)
-        } else {
-          traceback(e)
-          raveutils::rave_debug("Event expression with error raised")
-          cat(!!deparse1(eventExpr), '\n')
-        }
+        local({
+          error_handler <- !!error_handler
+          if(is.function(error_handler)){
+            error_handler(e)
+          } else {
+            raveutils::rave_debug("Event expression with error raised")
+            print(e$call)
+            cat(!!deparse(eventExpr), sep = '\n')
+            raveutils::rave_error("[Module ERROR] {e$message}")
+          }
+        })
       })
     }))
     handlerExpr = rlang::quo_squash(rlang::quo({
       tryCatch({ !!handlerExpr }, error = function(e){
-        raveutils::rave_error("[RAVE ERROR] {e$message}")
-        if(is.function(error_handler)){
-          error_handler(e)
-        } else {
-          traceback(e)
-          raveutils::rave_debug("Event expression with error raised")
-          cat(!!deparse1(handlerExpr), '\n')
-        }
+
+        local({
+          error_handler <- !!error_handler
+          if(is.function(error_handler)){
+            error_handler(e)
+          } else {
+            raveutils::rave_debug("Event expression with error raised")
+            print(e$call)
+            cat(!!deparse(handlerExpr), sep = '\n')
+            raveutils::rave_error("[Module ERROR] {e$message}")
+          }
+        })
       })
     }))
     if(!length(label) || is.na(label)){
@@ -68,6 +85,10 @@ make_observeEvent <- function(map, error_handler = NULL){
       event.quoted = TRUE, handler.quoted = TRUE,
       event.env = event.env, handler.env = handler.env,
       ignoreInit = ignoreInit, ..., label = label)
+    if(is.function(on_invalidate)){
+      map[[label]]$onInvalidate(on_invalidate)
+    }
+
     invisible(map[[label]])
   }
 
