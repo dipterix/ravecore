@@ -49,7 +49,7 @@ RAVEPreprocessSettings <- R6::R6Class(
       if(!self$old_version && !force){ return() }
       if( self$version < 0 ){
         if(length(self$data)){
-          raveutils::rave_debug("Migrating from an old format")
+          # raveutils::rave_debug("Migrating from an old format")
         }
       }
       # transfer from RAVE-Fir

@@ -2,16 +2,17 @@
 
 #' @export
 parse_module <- function(package, module_id, debug = FALSE){
-  raveutils::rave_context('default')
-  module <- loaded_rave_module(module_id)
-  if(is.null(module)){
-    module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
-  }
-  module$debug = debug
+  raveutils::with_rave_context('default', {
+    module <- loaded_rave_module(module_id)
+    if(is.null(module)){
+      module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
+    }
+    module$debug <- debug
 
-  container = module$add_container()
-  container$import_widgets()
-  container$parse_module()
+    container <- module$add_container()
+    container$import_widgets()
+    container$parse_module()
+  })
 
   container
 }

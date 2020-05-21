@@ -1,11 +1,43 @@
 # definition of modules and module repo
 
-rave_package_data_repository <- dipsaus::fastmap2()
+
+rave_loaded_packages <- dipsaus::fastmap2()
 rave_loaded_modules <- dipsaus::fastmap2()
+
 
 loaded_rave_module <- function(module_id){
   rave_loaded_modules[[module_id]]
 }
+
+loaded_rave_packages <- function(package){
+  if(!inherits(rave_loaded_packages[[package]], 'RAVEPackage')){
+    rave_loaded_packages[[package]] <- RAVEPackage$new(package)
+  }
+  rave_loaded_packages[[package]]
+}
+
+RAVEPackage <- R6::R6Class(
+  classname = 'RAVEPackage',
+  portable = FALSE,
+  cloneable = FALSE,
+  parent_env = asNamespace('ravecore'),
+  lock_objects = FALSE, # FIXME
+  public = list(
+    conf_path = character(0),
+
+    package_name = character(0),
+    package_data = NULL,
+    package_env = NULL,
+
+    initialize = function(package){
+      stopifnot2(requireNamespace(package, quietly = TRUE), msg = sprintf('Package [%s] not found', package))
+      self$conf_path <- normalizePath(system.file('rave.yaml', package = package), mustWork = TRUE)
+      self$package_name = package
+      self$package_data = dipsaus::fastmap2()
+      self$package_env <- asNamespace(package)
+    }
+  )
+)
 
 #' @export
 RAVEModule <- R6::R6Class(
@@ -14,6 +46,9 @@ RAVEModule <- R6::R6Class(
   cloneable = FALSE,
   parent_env = asNamespace('ravecore'),
   lock_objects = FALSE, # FIXME
+  private = list(
+    .package = NULL
+  ),
   public = list(
     debug = FALSE,
 
@@ -32,6 +67,7 @@ RAVEModule <- R6::R6Class(
 
     initialize = function(package, module_id, force = FALSE, debug = FALSE){
 
+      private$.package = loaded_rave_packages(package)
       self$package = package
       self$module_id = module_id
       self$package_env <- asNamespace(package)
@@ -47,8 +83,7 @@ RAVEModule <- R6::R6Class(
       } else {
         rave_loaded_modules[[module_id]] <- self
       }
-      rave_package_data_repository[[module_id]] %?<-% dipsaus::fastmap2()
-      self$package_data = rave_package_data_repository[[module_id]]
+      self$package_data <- private$.package$package_data
       self$containers %?<-% dipsaus::fastmap2()
 
 

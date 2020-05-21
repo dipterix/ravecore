@@ -53,6 +53,7 @@ RAVEContainer <- R6::R6Class(
       # trigger input change
       dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
                                value = Sys.time(), priority = 'event')
+      # shiny::updateTextInput(session, inputId = '..rave_import_data_ui_show..', value = Sys.time())
     },
 
     close_data_selector = function(session = shiny::getDefaultReactiveDomain()){
@@ -124,7 +125,7 @@ RAVEContainer <- R6::R6Class(
         # get all the inputs
         for(param in private$onload_variables){
           if(param != ''){
-            self$container_data[[param]] = session$input[[param]]
+            self$module$package_data[[param]] = session$input[[param]]
           }
         }
 
@@ -142,6 +143,7 @@ RAVEContainer <- R6::R6Class(
 
           self$`@set_data_status`(TRUE)
           self$last_loaded = Sys.time()
+          # shiny::updateTextInput(session, inputId = '..rave_data_loaded..', value = Sys.time())
           dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
 
           self$close_data_selector()
@@ -187,13 +189,13 @@ RAVEContainer <- R6::R6Class(
       self$container_data = dipsaus::fastmap2()
       self$input_update_levels = dipsaus::fastmap2()
       private$observer_list = dipsaus::fastmap2()
-      private$sneaky_observe = make_observe(private$observer_list)
-      private$sneaky_observeEvent = make_observeEvent(private$observer_list)
+      private$sneaky_observe = make_observe(private$observer_list, on_invalidate = self$`@invalidate`)
+      private$sneaky_observeEvent = make_observeEvent(private$observer_list, on_invalidate = self$`@invalidate`)
 
       # to control the custom observers
       self$user_observers = dipsaus::fastmap2()
-      self$mask_env$observe = make_observe(self$user_observers, on_invalidate = self$`@invalidate`)
-      self$mask_env$observeEvent = make_observeEvent(self$user_observers, on_invalidate = self$`@invalidate`)
+      self$wrapper_env$observe = make_observe(self$user_observers, on_invalidate = self$`@invalidate`)
+      self$wrapper_env$observeEvent = make_observeEvent(self$user_observers, on_invalidate = self$`@invalidate`)
 
     },
 
@@ -201,12 +203,14 @@ RAVEContainer <- R6::R6Class(
       if(!quoted){
         expr = substitute(expr)
       }
-      ctx <- raveutils::rave_context()
-      on.exit({
-        raveutils::rave_context(ctx$context, ctx$package, ctx$module_id, ctx$instance)
-      }, add = TRUE, after = TRUE)
-      raveutils::rave_context(context, self$package, self$module_id, self)
-      eval(expr, envir, ...)
+      raveutils::with_rave_context(
+        context, expr, package = self$package, module_id = self$module_id,
+        instance = self, quoted = TRUE, env = envir)
+      # ctx <- raveutils::rave_context()
+      # on.exit({
+      #   raveutils::rave_context(ctx$context, ctx$package, ctx$module_id, ctx$instance)
+      # }, add = TRUE, after = TRUE)
+      # raveutils::rave_context(context, self$package, self$module_id, self)
     },
 
     register_context = function(context){
@@ -360,10 +364,12 @@ RAVEContainer <- R6::R6Class(
     },
 
     `@register_shinysession` = function(session){
-      ctx = raveutils::rave_context()
-      if(ctx$context == 'rave_running' ){
+      # ctx = raveutils::rave_context()
+      # if(ctx$context == 'rave_running' ){
+      if(!is.null(session)){
         # Must be in correct context
-        stopifnot(identical(ctx$instance, self))
+        # stopifnot(identical(ctx$instance, self))
+        module_id <- self$module_id
         if(module_id != session$ns(NULL)){
           session = session$rootScope()$makeScope(module_id)
         }
@@ -445,9 +451,14 @@ RAVEContainer <- R6::R6Class(
     },
 
     `@invalidate` = function(...){
-      if(is.function(self$`@_invalidate`)){
-        self$`@_invalidate`(...)
-      }
+      # if(is.function(self$`@_invalidate`)){
+      #   self$`@_invalidate`(...)
+      # }
+
+      # check context
+      # ctx <- raveutils::rave_context()
+      # stopifnot2(identical(ctx$instance, self), msg = 'Context not set right')
+
     },
 
     `@_invalidate` = NULL,

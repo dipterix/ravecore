@@ -201,6 +201,8 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
         f <- get0(!!output_id)
         if(is.function(f)){
 
+          raveutils::rave_debug(!!sprintf('Rendering - %s', output_id))
+
           if(raveutils::test_farg(f, c('results'))){
             # combatible mode
             results = list(get_value = function(key, ifnotfound = NULL){
