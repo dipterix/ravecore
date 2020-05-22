@@ -39,10 +39,12 @@ RAVEContainer <- R6::R6Class(
     output_layout = list(),
     main_functions = list(),
     .data_validation = NULL,  # stores validation expression
-    has_data = FALSE,
+    .has_data = FALSE,
     auto_run = Inf,
 
     container_data = NULL,
+
+    .data_selector_opened = FALSE,
 
     open_data_selector = function(session = shiny::getDefaultReactiveDomain()){
       raveutils::rave_debug('Opening data selector')
@@ -50,10 +52,16 @@ RAVEContainer <- R6::R6Class(
         selector = sprintf('.rave-module-container[rave-module="%s"]', self$module_id),
         class = 'open'
       ))
+      session$sendCustomMessage(type = 'rave_remove_class',message = list(
+        selector = '#__rave__mask__',
+        class = 'hidden'
+      ))
       # trigger input change
       dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
                                value = Sys.time(), priority = 'event')
       # shiny::updateTextInput(session, inputId = '..rave_import_data_ui_show..', value = Sys.time())
+
+      self$data_selector_opened <- TRUE
     },
 
     close_data_selector = function(session = shiny::getDefaultReactiveDomain()){
@@ -65,6 +73,11 @@ RAVEContainer <- R6::R6Class(
         selector = sprintf('.rave-module-container[rave-module="%s"]', self$module_id),
         class = 'open'
       ))
+      session$sendCustomMessage(type = 'rave_add_class',message = list(
+        selector = '#__rave__mask__',
+        class = 'hidden'
+      ))
+      self$data_selector_opened <- FALSE
     },
 
     register_data_check = function(check_fun){
@@ -90,9 +103,11 @@ RAVEContainer <- R6::R6Class(
       }
       if(length(private$error_list)){
         raveutils::rave_debug('{self$module_label} needs to load more data...')
-        self$`@set_data_status`(FALSE)
+        self$has_data <- FALSE
+        # self$`@set_data_status`(FALSE)
       } else {
-        self$`@set_data_status`(TRUE)
+        self$has_data <- TRUE
+        # self$`@set_data_status`(TRUE)
       }
 
       list(check_list = self$container_data, error_list = private$error_list)
@@ -118,47 +133,12 @@ RAVEContainer <- R6::R6Class(
       }
       remove_observers(private$observer_list)
 
-      # If rave_running
-      private$sneaky_observeEvent({
-        session$input$..rave_import_data_btn..
-      }, {
-        # get all the inputs
-        for(param in private$onload_variables){
-          if(param != ''){
-            self$module$package_data[[param]] = session$input[[param]]
-          }
-        }
-
-        # Don't click the button twice
-        dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = TRUE)
-        on.exit({
-          dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = FALSE)
-        })
-        raveutils::rave_info("Loading start...")
-
-        tryCatch({
-          private$onload_action(self$container_data, self$module$package_data, getDefaultDataRepository())
-          # REMOVE all observers!!!
-          remove_observers(private$observer_list)
-
-          self$`@set_data_status`(TRUE)
-          self$last_loaded = Sys.time()
-          # shiny::updateTextInput(session, inputId = '..rave_data_loaded..', value = Sys.time())
-          dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
-
-          self$close_data_selector()
-        }, error = function(e){
-          raveutils::rave_error(e$message)
-          raveutils::rave_debug('[Module ERROR] Failures while loading data')
-          base::print(private$onload_action)
-        })
-
-
-      }, ignoreInit = TRUE)
-
-      # open loader panel
-      # self$open_data_selector()
-
+      tryCatch({
+        private$loader_interface(self$container_data,
+                                 self$module$package_data,
+                                 getDefaultDataRepository())
+      }, error = function(e){
+      })
     },
     register_onload_action = function(onload, variables = NULL){
       stopifnot2(is.function(onload), msg = 'register_onloader_action requires a function')
@@ -167,7 +147,39 @@ RAVEContainer <- R6::R6Class(
       private$onload_action = onload
       private$onload_variables = variables
     },
+    `@shiny_run_loader` = function(input, session = shiny::getDefaultReactiveDomain()){
+      # get all the inputs
+      for(param in private$onload_variables){
+        if(param != ''){
+          self$module$package_data[[param]] = session$input[[param]]
+        }
+      }
 
+      # Don't click the button twice
+      dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = TRUE)
+      on.exit({
+        dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = FALSE)
+      })
+      raveutils::rave_info("Loading start...")
+
+      tryCatch({
+        private$onload_action(self$container_data, self$module$package_data, getDefaultDataRepository())
+        # REMOVE all observers!!!
+        remove_observers(private$observer_list)
+
+        self$has_data <- TRUE
+        # self$`@set_data_status`(TRUE)
+        self$last_loaded = Sys.time()
+        # shiny::updateTextInput(session, inputId = '..rave_data_loaded..', value = Sys.time())
+        dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
+
+        self$close_data_selector()
+      }, error = function(e){
+        raveutils::rave_error(e$message)
+        raveutils::rave_debug('[Module ERROR] Failures while loading data')
+        base::print(private$onload_action)
+      })
+    },
 
     initialize = function(module){
       stopifnot2(inherits(module, 'RAVEModule'), msg = 'RAVEContainer must be initialized with a module instance')
@@ -623,9 +635,10 @@ RAVEContainer <- R6::R6Class(
     },
 
 
-    `@display_loader` = function(modal_info){
-      if(missing(modal_info)){
-        private$loader_info <- tryCatch({
+    `@display_loader` = function(){
+      # assign('self', self, envir = globalenv())
+      shiny::isolate({
+        modal_info <- tryCatch({
           private$loader_interface(self$container_data,
                                    self$module$package_data,
                                    getDefaultDataRepository())
@@ -633,52 +646,20 @@ RAVEContainer <- R6::R6Class(
           raveutils::rave_error("Captured error: {e$message} in call:")
           traceback(e)
         })
-        modal_info = private$loader_info
+      })
+
+      modal_info
+    },
+
+    `@safe_close_selector` = function(){
+      if(self$has_data){
+        module_remove_notification()
+        self$close_data_selector()
+      } else {
+        module_notification('This module needs to load more data to proceed. If you want to switch modules, browse other options by clicking on sidebar')
+        # go to previous module
+        # adapter$switch_container(app_data$last_module_id)
       }
-
-      ns = shiny::NS(self$module_id)
-      title <- modal_info$title
-      if(length(title) != 1){ title = 'Load module data' }
-
-      est_loadtime <- modal_info$expectedloadingtime
-      est_loadtime %?<-% '(short)'
-      # est_loadsize <- modal_info$expectedloadingsize
-      # est_loadsize %?<-% '(small)'
-
-      # shinydashboard::menuItem(
-      shiny::tagList(
-        text = title,
-        modal_info$ui,
-        shiny::hr(),
-        shiny::tags$small(
-          'Expected load: ', as.character(est_loadtime), ' seconds'),
-        shiny::div(
-          style = 'display: grid; display: flex; flex-flow: column; padding:10px 0;',
-          dipsaus::actionButtonStyled(
-            ns('..rave_import_data_btn..'), "Load Data"),
-          shiny::actionButton(
-            ns('..rave_import_data_btn_cancel..'), "Previous Module")
-        )
-        # startExpanded = TRUE
-      )
-      # shiny::fluidRow(
-      #   box(
-      #     width = 12L,collapsible = FALSE,
-      #     title = title,
-      #     modal_info$ui,
-      #     shiny::hr(),
-      #     shiny::tags$small(
-      #       'Expected load: ', as.character(est_loadtime), ' seconds'),
-      #     shiny::div(
-      #       shiny::actionButton(
-      #         ns('..rave_import_data_btn_cancel..'), "Previous Module"),
-      #       dipsaus::actionButtonStyled(
-      #         ns('..rave_import_data_btn..'), "Load Data")
-      #     )
-      #
-      #   )
-      # )
-
     },
 
     `@set_data_status` = function(has_data){
@@ -717,6 +698,40 @@ RAVEContainer <- R6::R6Class(
     },
     output_ids = function(){
       names(self$output_components)
+    },
+
+    has_data = function(v){
+      if(!missing(v)){
+        self$.has_data = !isFALSE(v)
+        if(self$.has_data){
+          raveutils::rave_debug('Resuming module observers')
+          lapply(names(self$user_observers), function(nm){
+            self$user_observers[[nm]]$resume()
+          })
+        } else {
+          raveutils::rave_debug('Stopping module observers')
+          lapply(names(self$user_observers), function(nm){
+            self$user_observers[[nm]]$suspend()
+          })
+        }
+      }
+      self$.has_data
+    },
+
+    data_selector_opened = function(v){
+      if(!missing(v)){
+        self$.data_selector_opened = isTRUE(v)
+        if(self$.data_selector_opened){
+          lapply(names(private$observer_list), function(nm){
+            private$observer_list[[nm]]$resume()
+          })
+        } else {
+          lapply(names(private$observer_list), function(nm){
+            private$observer_list[[nm]]$suspend()
+          })
+        }
+      }
+      self$.data_selector_opened
     }
 
   )

@@ -249,11 +249,11 @@ app_ui_env[['rave-main-app']] <- function(adapter, theme = 'purple', ...){
   body_items <- lapply(minfos$module_id, function(module_id){
     as.call(list(
       quote(shinydashboard::tabItem),
-      tabName = stringr::str_to_upper(module_id),
-      as.call(list(
-        quote(shiny::uiOutput),
-        sprintf('%s_UI', module_id)
-      ))
+      tabName = stringr::str_to_upper(module_id)
+      # as.call(list(
+      #   quote(shiny::uiOutput),
+      #   sprintf('%s_UI', module_id)
+      # ))
     ))
   })
   body_call <- as.call(c(list(
@@ -324,7 +324,8 @@ app_server_main <- function(input, output, session, adapter){
         container$with_context('rave_running', {
           shiny::callModule(shinirize, id = container$module_id,
                             container = container,
-                            app_data = app_data)
+                            app_data = app_data,
+                            adapter = adapter)
         })
 
         # shinirize(input, output, session, container, app_data)
@@ -408,7 +409,18 @@ app_server_main <- function(input, output, session, adapter){
     rm(container)
   }
 
+  current_container <- function(){
+    module_id <- raveutils::from_rave_context('module_id')
+    if(length(module_id)){
+      return(get_container(module_id))
+    }
+    NULL
+  }
 
+  # ---- Register to adapter
+  adapter$switch_container <- switch_container
+
+  # ---- When modules are switching back and forth
   shiny::observeEvent(input$..rave_sidebar.., {
     # make sure the corresponding module top the session
     module_id_uppercase <- stringr::str_to_upper(input$..rave_sidebar..)
@@ -438,8 +450,30 @@ app_server_main <- function(input, output, session, adapter){
     switch_container(app_data$last_module_id)
   })
 
+  # ---- Control containers
+  shiny::observeEvent(input$data_select, {
+
+    container <- current_container()
+    if(inherits(container, 'RAVEContainer')){
+
+      if(container$data_selector_opened){
+        container$`@safe_close_selector`()
+      } else {
+        raveutils::rave_debug('Open up data selector')
+        container$`@shiny_resume`(close_if_pass = FALSE)
+      }
+    } else {
+      raveutils::rave_debug('Cannot find container to open up data selector')
+    }
+  })
+
 
   session$onSessionEnded(function() {
+
+    if(isTRUE(adapter$test.mode)){
+      return()
+    }
+
     raveutils::rave_debug('Session ended')
     # clear containers
     for(nm in names(containers)){
@@ -481,6 +515,7 @@ start_rave <- function(host = '127.0.0.1', port = NULL, launch_browser=TRUE,
   }
 
   app <- shiny::shinyApp(ui, server, options = list(
+    test.mode = test_mode,
     launch.browser=launch_browser, host = host, port = port))
 
   print(app)

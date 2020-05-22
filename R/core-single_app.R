@@ -25,7 +25,9 @@ instantiate_module <- function(package, module_id, debug = FALSE){
             class = 'rave-dashboard-loader-wrapper',
             shiny::div(
               class = 'rave-dashboard-loader',
-              shiny::uiOutput(self$ns("..rave_data_loader..")),
+              shiny::fluidRow(
+                shiny::uiOutput(self$ns("..rave_data_loader.."))
+              ),
               shiny::div(
                 class = 'hidden',
                 shiny::textInput(self$ns('..rave_import_data_ui_show..'), '')

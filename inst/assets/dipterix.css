@@ -147,7 +147,7 @@ body.rave-noscroll {
     height: 100vh;
     background-color: rgba(0,0,0,0.9);
     position: fixed;
-    z-index: 1020;
+    z-index: 700;
     padding: 50px;
     color: #f2f2f2;
     left: 0;
@@ -491,7 +491,7 @@ div[class^="col-xs-"] {
 .rave-input-panel,
 .left-side,
 .main-sidebar{
-  z-index: 0 !important;
+  /* z-index: 0 !important; */
   max-height: 100vh;
   overflow-x: hidden;
   overflow-y: scroll;
@@ -791,8 +791,10 @@ body,
   overflow:hidden;
 }
 
-.wrapper {
+body .wrapper {
   height: 100vh;
+  max-height: 100vh;
+  overflow-y: hidden;
 }
 
 .main-header .navbar {
@@ -828,6 +830,14 @@ body,
 .rave-dashboard-loader-wrapper {
   display: none;
   opacity: 0;
+  max-height: 100vh;
+  overflow-y: scroll;
+  position: relative;
+  z-index: 800;
+}
+
+.rave-dashboard-loader-content {
+  background-color: #FFFFFF;
 }
 
 .rave-dashboard-loader-wrapper .rave-dashboard-loader{
