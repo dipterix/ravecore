@@ -5,7 +5,10 @@ rave_loaded_packages <- dipsaus::fastmap2()
 rave_loaded_modules <- dipsaus::fastmap2()
 
 
-loaded_rave_module <- function(module_id){
+loaded_rave_module <- function(module_id, package = NULL){
+  if(is.null(rave_loaded_modules[[module_id]]) && length(package)){
+    rave_loaded_modules[[module_id]] = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
+  }
   rave_loaded_modules[[module_id]]
 }
 

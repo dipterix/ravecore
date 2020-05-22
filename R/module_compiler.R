@@ -3,7 +3,7 @@
 #' @export
 parse_module <- function(package, module_id, debug = FALSE){
   raveutils::with_rave_context('default', {
-    module <- loaded_rave_module(module_id)
+    module <- loaded_rave_module(module_id, package)
     if(is.null(module)){
       module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
     }

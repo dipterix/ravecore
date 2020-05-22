@@ -107,7 +107,7 @@ getDefaultPackageData.rave_running_local <- ..getDefaultPackageData
 getDefaultPackageData.rave_module_debug <- function(){
   module_id <- raveutils::from_rave_context('module_id')
   package <- raveutils::from_rave_context('package')
-  module <- loaded_rave_module(module_id)
+  module <- loaded_rave_module(module_id, package)
   if(!inherits(module, 'RAVEModule')){
     module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
   }

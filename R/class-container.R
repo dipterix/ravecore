@@ -81,7 +81,7 @@ RAVEContainer <- R6::R6Class(
         }, rave_check_error = function(e){
           # only captures rave_check_error
           private$error_list[[e$message]] <- e
-          raveutils::rave_info('[Module Validation]: {e$message}')
+          raveutils::rave_info('\r[Module Validation]: {e$message}')
         }, error = function(e){
           raveutils::rave_error("Captured unknown error: {e$message} in call:")
           traceback(e)
@@ -399,9 +399,17 @@ RAVEContainer <- R6::R6Class(
       ran = FALSE
       init_time <- Sys.time()
 
-      for(ii in seq_along(self$main_functions)){
+      n_funcs <- length(self$main_functions)
+
+      progress <- dipsaus::progress2(self$module_label,
+                                     max = n_funcs,
+                                     shiny_auto_close = TRUE)
+
+      for(ii in seq_len(n_funcs)){
         start_time <- Sys.time()
         main_f = self$main_functions[[ii]]
+
+        progress$inc(sprintf('%s (%d of %d)', main_f$section, ii, n_funcs))
         if(length(main_f$include)){
           # digest and monitored changes
           # evaluate in param_env?

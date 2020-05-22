@@ -278,6 +278,7 @@ app_ui_env[['rave-main-app']] <- function(adapter, theme = 'purple', ...){
 
 app_server_main <- function(input, output, session, adapter){
 
+  rave_id <- raveutils::add_to_session(session, 'rave_id')
   adapter$module_list %?<-% find_modules()
 
   test_mode <- isTRUE(adapter$test.mode)
@@ -289,7 +290,6 @@ app_server_main <- function(input, output, session, adapter){
   app_data <- dipsaus::fastmap2()
   app_data$delay_input = ravecore::rave_options('delay_input')
 
-  reactive_data <- shiny::reactiveValues()
 
   internal_observers = dipsaus::fastmap2()
   if(test_mode){
@@ -340,9 +340,11 @@ app_server_main <- function(input, output, session, adapter){
             module_id = minfo$module_id,
             debug = test_mode)
 
-          shiny::callModule(shinirize, id = container$module_id,
-                            container = container,
-                            app_data = app_data)
+          container$with_context('rave_running', {
+            shiny::callModule(shinirize, id = container$module_id,
+                              container = container,
+                              app_data = app_data)
+          })
 
 
           # shinirize(input, output, session, container, app_data)
@@ -367,7 +369,7 @@ app_server_main <- function(input, output, session, adapter){
 
     shiny::removeNotification('..rave_error..', session)
 
-    assign('aaa', container, envir = globalenv())
+    # assign('aaa', container, envir = globalenv())
     # assign('session', session, envir = globalenv())
     raveutils::add_to_session(session, key = 'rave_instance', val = container, override = TRUE)
     container$register_context('rave_running')
@@ -389,9 +391,25 @@ app_server_main <- function(input, output, session, adapter){
     container$`@shiny_resume`()
   }
 
+  remove_container <- function(module_id){
+    module_id <- stringr::str_to_upper(module_id)
+    container <- containers[[module_id]]
+
+    # remove from ravecore:::rave_loaded_modules$module_id
+    .subset2(container$module$containers, 'remove')(rave_id)
+
+    raveutils::clear_env(container$user_observers)
+    raveutils::clear_env(container$runtime_env)
+    raveutils::clear_env(container$mask_env)
+    raveutils::clear_env(container$static_env)
+    raveutils::clear_env(container$wrapper_env)
+    raveutils::clear_env(container$container_data)
+
+    rm(container)
+  }
 
 
-  observeEvent(input$..rave_sidebar.., {
+  shiny::observeEvent(input$..rave_sidebar.., {
     # make sure the corresponding module top the session
     module_id_uppercase <- stringr::str_to_upper(input$..rave_sidebar..)
 
@@ -416,11 +434,55 @@ app_server_main <- function(input, output, session, adapter){
     }
   }, priority = Inf)
 
-  observeEvent(input$..rave_switch_back.., {
+  shiny::observeEvent(input$..rave_switch_back.., {
     switch_container(app_data$last_module_id)
   })
 
 
+  session$onSessionEnded(function() {
+    raveutils::rave_debug('Session ended')
+    # clear containers
+    for(nm in names(containers)){
+      remove_container(nm)
+    }
 
+    adapter$active_session = adapter$active_session - 1L
+    if(adapter$active_session == 0){
+      raveutils::rave_info('No active shiny session - Reset context')
+      # set context
+      ctx <- adapter$context
+      if(isTRUE(ctx$context == 'rave_module_debug')){
+        raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id)
+      } else {
+        raveutils::rave_context('default')
+      }
+      rm(ctx)
+    }
+
+    raveutils::clear_env(session$userData)
+
+  })
+
+}
+
+#' @export
+start_rave <- function(host = '127.0.0.1', port = NULL, launch_browser=TRUE,
+                       test_mode = FALSE, token = NULL, theme = 'purple'){
+  adapter <- dipsaus::fastmap2()
+  adapter$test.mode = isTRUE(test_mode)
+  adapter$context <- raveutils::rave_context()
+  adapter$active_session <- 0L
+
+  ui <- app_ui(adapter = adapter, theme = theme, token = token)
+
+  server <- function(input, output, session){
+    adapter$active_session <- adapter$active_session + 1L
+    app_server_main(input, output, session, adapter)
+  }
+
+  app <- shiny::shinyApp(ui, server, options = list(
+    launch.browser=launch_browser, host = host, port = port))
+
+  print(app)
 }
 
