@@ -34,7 +34,13 @@ RAVEPackage <- R6::R6Class(
 
     initialize = function(package){
       stopifnot2(requireNamespace(package, quietly = TRUE), msg = sprintf('Package [%s] not found', package))
-      self$conf_path <- normalizePath(system.file('rave.yaml', package = package), mustWork = TRUE)
+      context <- raveutils::from_rave_context('context')
+      if(context != 'rave_module_debug'){
+        self$conf_path <- normalizePath(system.file('rave2.yaml', package = package), mustWork = TRUE)
+      } else {
+        self$conf_path <- raveutils::package_file('inst/rave2.yaml')
+      }
+
       self$package_name = package
       self$package_data = dipsaus::fastmap2()
       self$package_env <- asNamespace(package)
@@ -91,7 +97,7 @@ RAVEModule <- R6::R6Class(
 
 
       # self$analyze_module()
-      rave_conf = self$get_path('rave.yaml')
+      rave_conf = self$get_path('rave2.yaml')
       self$package_config = raveutils::load_yaml(rave_conf)
       for(conf in self$package_config$modules){
         if(conf$module_id == self$module_id){

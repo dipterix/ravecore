@@ -7,6 +7,22 @@ getDefaultDataRepository <- function(){
   .RAVEGlobalEnv
 }
 
+getDefaultContainer <- raveutils::rave_context_generics('getDefaultContainer')
+
+getDefaultContainer.rave_running <- function(){
+  raveutils::from_rave_context('instance')$container_reactives
+}
+
+getDefaultContainer.rave_running_local <- function(){
+  list()
+}
+getDefaultContainer.default <- function(){
+  list()
+}
+getDefaultContainer.rave_module_debug <- function(){
+  list()
+}
+
 
 #' @export
 getDefaultReactiveInput <- raveutils::rave_context_generics('getDefaultReactiveInput', alist(isolated = FALSE, ...=))

@@ -43,6 +43,7 @@ RAVEContainer <- R6::R6Class(
     auto_run = Inf,
 
     container_data = NULL,
+    container_reactives = NULL,
 
     .data_selector_opened = FALSE,
 
@@ -57,9 +58,9 @@ RAVEContainer <- R6::R6Class(
         class = 'hidden'
       ))
       # trigger input change
-      dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
-                               value = Sys.time(), priority = 'event')
-      # shiny::updateTextInput(session, inputId = '..rave_import_data_ui_show..', value = Sys.time())
+      self$container_reactives$..rave_import_data_ui_show.. <- Sys.time()
+      # dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
+      #                          value = Sys.time(), priority = 'event')
 
       self$data_selector_opened <- TRUE
     },
@@ -170,8 +171,8 @@ RAVEContainer <- R6::R6Class(
         self$has_data <- TRUE
         # self$`@set_data_status`(TRUE)
         self$last_loaded = Sys.time()
-        # shiny::updateTextInput(session, inputId = '..rave_data_loaded..', value = Sys.time())
-        dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
+        # dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..', value = Sys.time())
+        self$container_reactives$..rave_data_loaded.. <- Sys.time()
 
         self$close_data_selector()
       }, error = function(e){
@@ -385,6 +386,8 @@ RAVEContainer <- R6::R6Class(
         if(module_id != session$ns(NULL)){
           session = session$rootScope()$makeScope(module_id)
         }
+
+        self$container_reactives = shiny::reactiveValues()
 
         self$wrapper_env$session = session
         self$wrapper_env$input = session$input
@@ -637,6 +640,7 @@ RAVEContainer <- R6::R6Class(
 
     `@display_loader` = function(){
       # assign('self', self, envir = globalenv())
+      remove_observers(private$observer_list)
       shiny::isolate({
         modal_info <- tryCatch({
           private$loader_interface(self$container_data,

@@ -1,10 +1,6 @@
 # creating observers, but keep track of the handlers
-make_observe <- function(map, error_handler = NULL, on_invalidate = NULL, env = NULL){
+make_observe <- function(map, error_handler = NULL, on_invalidate = NULL){
   stopifnot(inherits(map, 'fastmap2'))
-
-  if(!is.environment(env)){
-    env <- quote(parent.frame())
-  }
 
   function(x, env = parent.frame(), quoted = FALSE, ..., label = rand_string(10)){
     if(!quoted){ x = substitute(x) }
@@ -27,7 +23,12 @@ make_observe <- function(map, error_handler = NULL, on_invalidate = NULL, env = 
     if(!length(label) || is.na(label)){
       label = rand_string(11)
     }
-    map[[label]] <- shiny::observe(x = x, env = env, quoted = TRUE, ..., label = label)
+    call <- as.call(list(
+      quote(shiny::observe),
+      x = x, env = env, quoted = FALSE, ...,
+      label = label
+    ))
+    map[[label]] <- local({eval(call)})
     if(is.function(on_invalidate)){
       map[[label]]$onInvalidate(on_invalidate)
     }
@@ -80,11 +81,14 @@ make_observeEvent <- function(map, error_handler = NULL, on_invalidate = NULL){
     if(!length(label) || is.na(label)){
       label = rand_string(13)
     }
-    map[[label]] <- shiny::observeEvent(
+    call <- as.call(list(
+      quote(shiny::observeEvent),
       eventExpr = eventExpr, handlerExpr = handlerExpr,
-      event.quoted = TRUE, handler.quoted = TRUE,
+      event.quoted = FALSE, handler.quoted = FALSE,
       event.env = event.env, handler.env = handler.env,
-      ignoreInit = ignoreInit, ..., label = label)
+      ignoreInit = ignoreInit, ..., label = label
+    ))
+    map[[label]] <- local({ eval(call) })
     if(is.function(on_invalidate)){
       map[[label]]$onInvalidate(on_invalidate)
     }

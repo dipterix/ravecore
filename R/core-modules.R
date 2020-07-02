@@ -8,7 +8,7 @@ module_exists <- function(package, module_id){
   }
 
   # get rave.yaml
-  conf <- system.file('rave.yaml', package = package, mustWork = FALSE)
+  conf <- system.file('rave2.yaml', package = package, mustWork = FALSE)
   if(!file.exists(conf)){
     return(FALSE)
   }
@@ -70,13 +70,13 @@ find_modules <- function(packages){
     lib_paths <- .libPaths()
     packages <- unlist(lapply(lib_paths, function(path){
       pkg <- list.dirs(path, full.names = FALSE, recursive = FALSE)
-      pkg[file.exists(file.path(path, pkg, 'rave.yaml'))]
+      pkg[file.exists(file.path(path, pkg, 'rave2.yaml'))]
     }))
   }
   packages <- unique(packages)
   modules <- dipsaus::fastmap2()
   lapply(packages, function(pkg){
-    conf <- raveutils::load_yaml(system.file('rave.yaml', package = pkg))
+    conf <- raveutils::load_yaml(system.file('rave2.yaml', package = pkg))
     for(minfo in conf$modules){
       minfo$package = pkg
       minfo$notes = ''
@@ -471,6 +471,18 @@ app_server_main <- function(input, output, session, adapter){
   session$onSessionEnded(function() {
 
     if(isTRUE(adapter$test.mode)){
+      adapter$active_session = adapter$active_session - 1L
+      if(adapter$active_session == 0){
+        raveutils::rave_info('No active shiny session - Reset context')
+        # set context
+        ctx <- adapter$context
+        if(isTRUE(ctx$context == 'rave_module_debug')){
+          raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
+        } else {
+          raveutils::rave_context('default', .force = TRUE)
+        }
+        rm(ctx)
+      }
       return()
     }
 
@@ -486,9 +498,9 @@ app_server_main <- function(input, output, session, adapter){
       # set context
       ctx <- adapter$context
       if(isTRUE(ctx$context == 'rave_module_debug')){
-        raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id)
+        raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
       } else {
-        raveutils::rave_context('default')
+        raveutils::rave_context('default', .force = TRUE)
       }
       rm(ctx)
     }

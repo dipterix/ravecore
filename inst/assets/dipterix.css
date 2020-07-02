@@ -862,6 +862,11 @@ body .wrapper {
 
 .rave-module-container.open .rave-dashboard-loader {
   height: auto;
+  min-height: 70vh;
+}
+
+.rave-dashboard-loader .selectize-dropdown {
+  position: initial;
 }
 
 .rave-module-container.open .rave-module-main{

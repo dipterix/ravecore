@@ -119,6 +119,12 @@ Shiny.addCustomMessageHandler("rave_set_id", (key) => {
   _this.current_key = key;
 });
 
+Shiny.addCustomMessageHandler("rave_rebindall", (key) => {
+  // Force shiny to bind all DOM changes
+  Shiny.unbindAll();
+  Shiny.bindAll();
+});
+
 Shiny.addCustomMessageHandler('rave_set_theme', (params) => {
   let theme = params.theme || 'light';
   $('body').removeClass('rave-dark');

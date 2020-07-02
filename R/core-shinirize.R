@@ -10,68 +10,6 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   # Register shiny session
   container$`@register_shinysession`(session)
 
-  # -------------- Register UI ------------------
-  shiny::insertUI(
-    selector = sprintf('#shiny-tab-%s', stringr::str_to_upper(container$module_id)),
-    where = 'afterBegin', immediate = TRUE, multiple = FALSE,
-    ui =
-      shiny::div(
-        class = 'rave-module-container open',
-        `rave-module` = container$module_id,
-        shiny::div(
-          class = 'rave-dashboard-loader-wrapper',
-          shiny::div(
-            class = 'rave-dashboard-loader',
-            shiny::column(
-              class = 'rave-dashboard-loader-content',
-              width = 12L,
-              shiny::h4(sprintf('Select data to load for module - %s', container$module_label)),
-              shiny::hr(),
-              shiny::uiOutput(container$ns("..rave_data_loader..")),
-              shiny::div(
-                style = 'padding: 10px 0; float: right;',
-                shiny::actionButton(
-                  container$ns('..rave_import_data_btn_cancel..'), "Cancel"),
-                shiny::span(dipsaus::html_asis(' ')),
-                dipsaus::actionButtonStyled(
-                  container$ns('..rave_import_data_btn..'), "Load Data")
-              )
-            ),
-            shiny::div(
-              class = 'hidden'
-              # shiny::textInput(container$ns('..rave_import_data_ui_show..'), '')
-              # shiny::textInput(container$ns('..rave_data_loaded..'), '')
-            )
-          )
-        ),
-        shiny::div(
-          class = 'rave-module-main-wrapper',
-          shiny::div(
-            class = 'rave-module-main',
-            shiny::fluidRow(
-              shiny::column(
-                width = 3L,
-                shiny::fluidRow(
-                  container$`@input_panel`()
-                )
-              ),
-              shiny::column(
-                width = 9L,
-                shiny::fluidRow(
-                  container$`@output_panel`()
-                )
-              )
-            )
-          )
-
-        )
-
-      )
-  )
-
-
-
-
 
   # ------------ Load dynamic scripts ------------
   raveutils::rave_info('[{container$module_label}] Loading dynamic scripts...')
@@ -111,7 +49,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   initialize_module <- function(){
     raveutils::rave_debug('Initialize inputs')
 
-    local_reactives$initialized = TRUE
+    local_map$initialize_error = FALSE
 
     # Check and update inputs
     for(expr in container$init_script){
@@ -123,7 +61,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
         print(expr)
         print(e$call)
         module_notification('Error while initializing module.')
-        local_reactives$initialized = FALSE
+        local_map$initialize_error = TRUE
       })
 
     }
@@ -138,22 +76,32 @@ shinirize <- function(input, output, session, container, app_data, adapter){
         raveutils::rave_error(e$message)
         print(e$call)
         module_notification('Error while updating input: ', comp$input_id)
-        local_reactives$initialized = FALSE
+        local_map$initialize_error = TRUE
       })
     }
+
+    if(!local_map$initialize_error){
+      local_reactives$initialized = TRUE
+      container$last_loaded = app_data$last_loaded
+    } else {
+      local_reactives$initialized = FALSE
+    }
+
 
   }
 
   # When data load succeeds
-  shiny::observeEvent(input$..rave_data_loaded.., {
+  shiny::observeEvent(container$container_reactives$..rave_data_loaded.., {
     raveutils::rave_debug('Data loaded signal received')
     if(!isFALSE(container$has_data)){
       container$close_data_selector(session = session)
-      if(!local_reactives$initialized){
+
+      if(!isTRUE(container$last_loaded == app_data$last_loaded)){
         initialize_module()
       }
+
     }
-  }, ignoreNULL = TRUE, priority = 999)
+  }, ignoreNULL = TRUE, priority = -1000)
 
 
 
@@ -164,7 +112,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     container$wrapper_env$observeEvent(input[[input_id]], {
 
       if(local_reactives$initialized && container$has_data){
-        rave_debug('{input_id} (changed)')
+        # rave_debug('{input_id} (changed)')
         now = Sys.time()
         input_update_level = max(local_map$input_update_level, container$input_update_levels[[input_id]])
         local_map$input_changed = now
@@ -277,27 +225,26 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     rave_debug("{container$module_label} is checking data...")
     # local_reactives$initialized = FALSE
     # container$has_data = FALSE
-    assign('container', container, envir = globalenv())
 
     container$run_data_check()
     if(isFALSE(container$has_data)){
       container$open_data_selector(session = session)
       container$run_loader_interface(session = session)
-      # shiny::updateTextInput(session, inputId = '..rave_import_data_ui_show..', value = Sys.time())
-      dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
-                               value = Sys.time(), priority = 'event')
+      # dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
+      #                          value = Sys.time(), priority = 'event')
+      container$container_reactives$..rave_import_data_ui_show.. <- Sys.time()
     } else if(close_if_pass){
       raveutils::rave_debug('Automatically hide selector')
       container$close_data_selector(session = session)
-      # shiny::updateTextInput(session, inputId = '..rave_data_loaded..', value = Sys.time())
-      dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..',
-                               value = Sys.time(), priority = 'event')
+      # dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..',
+      #                          value = Sys.time(), priority = 'event')
+      container$container_reactives$..rave_data_loaded..
     } else {
       container$open_data_selector(session = session)
       container$run_loader_interface(session = session)
-      # shiny::updateTextInput(session, inputId = '..rave_import_data_ui_show..', value = Sys.time())
-      dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
-                               value = Sys.time(), priority = 'event')
+      # dipsaus::set_shiny_input(session = session, inputId = '..rave_import_data_ui_show..',
+      #                          value = Sys.time(), priority = 'event')
+      container$container_reactives$..rave_import_data_ui_show.. <- Sys.time()
     }
 
   }
@@ -309,14 +256,14 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
     check_data(close_if_pass = close_if_pass)
 
-    # In case other modules has loaded data
-    if(container$has_data){
-      # initialize ?
-      if(!isTRUE(app_data$last_loaded == container$last_loaded)){
-        initialize_module()
-        container$last_loaded = app_data$last_loaded
-      }
-    }
+    # # In case other modules has loaded data
+    # if(container$has_data){
+    #   # initialize ?
+    #   if(!isTRUE(app_data$last_loaded == container$last_loaded)){
+    #     initialize_module()
+    #
+    #   }
+    # }
 
   }
 
@@ -333,9 +280,10 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
   # Whenever data is missing or user wants to change data
   output$..rave_data_loader.. <- shiny::renderUI({
-    local_reactives$initialized
-    # print(input$..rave_import_data_ui_show..)
-    print(raveutils:::gl('Showing data panel - {container$module_id}'))
+    base::print(local_reactives$initialized)
+    base::print(container$container_reactives$..rave_import_data_ui_show..)
+
+    raveutils::rave_info('Showing data panel')
     modal_info <- container$`@display_loader`()
     est_loadtime <- modal_info$expectedloadingtime
     if(length(est_loadtime) == 1){
@@ -344,10 +292,75 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     } else {
       est_loadtime <- ''
     }
+    local_reactives$rebind <- Sys.time()
     shiny::tagList(
       modal_info$ui,
       shiny::hr(),
       est_loadtime
     )
   })
+  shiny::observeEvent(container$container_reactives$..rave_import_data_ui_show.., {
+    session$sendCustomMessage(type = 'rave_rebindall', message = list())
+  })
+
+
+
+
+
+  # -------------- Register UI ------------------
+  shiny::insertUI(
+    selector = sprintf('#shiny-tab-%s', stringr::str_to_upper(container$module_id)),
+    where = 'afterBegin', immediate = TRUE, multiple = FALSE,
+    ui =
+      shiny::div(
+        class = 'rave-module-container open',
+        `rave-module` = container$module_id,
+        shiny::div(
+          class = 'rave-dashboard-loader-wrapper',
+          shiny::div(
+            class = 'rave-dashboard-loader',
+            shiny::column(
+              class = 'rave-dashboard-loader-content',
+              width = 12L,
+              shiny::h4(sprintf('Select data to load for module - %s', container$module_label)),
+              shiny::hr(),
+              shiny::uiOutput(container$ns("..rave_data_loader..")),
+              shiny::div(
+                style = 'padding: 10px 0; float: right;',
+                shiny::actionButton(
+                  container$ns('..rave_import_data_btn_cancel..'), "Cancel"),
+                shiny::span(dipsaus::html_asis(' ')),
+                dipsaus::actionButtonStyled(
+                  container$ns('..rave_import_data_btn..'), "Load Data")
+              )
+            ),
+            shiny::div(
+              class = 'hidden'
+            )
+          )
+        ),
+        shiny::div(
+          class = 'rave-module-main-wrapper',
+          shiny::div(
+            class = 'rave-module-main',
+            shiny::fluidRow(
+              shiny::column(
+                width = 3L,
+                shiny::fluidRow(
+                  container$`@input_panel`()
+                )
+              ),
+              shiny::column(
+                width = 9L,
+                shiny::fluidRow(
+                  container$`@output_panel`()
+                )
+              )
+            )
+          )
+
+        )
+
+      )
+  )
 }
