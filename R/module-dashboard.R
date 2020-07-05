@@ -90,7 +90,6 @@ rave_dash_page <- function(
       x
     }
 
-    # shinydashboard:::
     appendDependencies(x, dashboardDeps)
   }
 
@@ -104,12 +103,13 @@ rave_dash_page <- function(
   addDeps(
     shiny::tags$body(
       class = paste0("skin-", skin, cls), # if you want control-sidebar to be opened, add " control-sidebar-open"
+
       style = "min-height: 611px;",
       shiny::tags$head(shiny::tags$link(
         rel = "icon", type = "image/x-icon",
         href = dipsaus::to_datauri(system.file('assets/images/favicon.ico', package = 'ravecore')))),
       shiny::bootstrapPage(
-        shinyjs::useShinyjs(),
+        raveutils::register_js(),
         shiny::div(
           id = '__rave__mask__',
           class = ifelse(is.null(initial_mask), 'hidden', ''),

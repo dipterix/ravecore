@@ -419,7 +419,6 @@ RAVEContainer <- R6::R6Class(
       progress <- dipsaus::progress2(self$module_label,
                                      max = n_funcs,
                                      shiny_auto_close = TRUE)
-
       for(ii in seq_len(n_funcs)){
         start_time <- Sys.time()
         main_f = self$main_functions[[ii]]
@@ -457,12 +456,12 @@ RAVEContainer <- R6::R6Class(
         tryCatch({
           dipsaus::eval_dirty(main_f$expr, env = self$runtime_env)
         }, error = function(e){
-          raveutils::rave_warn("Please check the following line:")
+          raveutils::rave_warn("Please check the following line:", style = 'fatal')
           base::print(main_f$expr)
 
           base::print(e$call)
           raveutils::rave_fatal('[{module_label}]: Part {ii}: Error found in section {sQuote(main_f$section)}:\n',
-                                '  {e$message}\n', 'Please check the messages above for debugging information.',
+                                '  {e$message}\n', 'Please check the messages above for bug information.',
                                 call = 'See above messages')
         })
         timer = structure(dipsaus::time_delta(start_time, Sys.time()), unit = 's', class = 'rave-units')
@@ -470,7 +469,6 @@ RAVEContainer <- R6::R6Class(
       }
       timer = structure(dipsaus::time_delta(init_time, Sys.time()), unit = 's', class = 'rave-units')
       raveutils::rave_debug('[{module_label}]: finished main.R in {timer}, start rendering')
-
     },
 
     `@invalidate` = function(...){

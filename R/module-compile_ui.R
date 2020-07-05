@@ -203,18 +203,19 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
 
           raveutils::rave_debug(!!sprintf('Rendering - %s', output_id))
 
-          if(raveutils::test_farg(f, c('results'))){
+          if(raveutils::test_farg(f, c('results'), dots = FALSE)){
             # combatible mode
             results = list(get_value = function(key, ifnotfound = NULL){
               get0(key, ifnotfound = ifnotfound)
             })
             f(results)
           } else{
+            .ns <- asNamespace('ravecore')
             args = c(TRUE, raveutils::test_farg(f, c('session_data', 'package_data', 'global_data')))
             args = list(quote(f),
-                        session_data = quote(ravecore:::getDefaultSessionData()),
-                        package_data = quote(ravecore:::getDefaultPackageData()),
-                        global_data = quote(ravecore:::getDefaultDataRepository()))[args]
+                        session_data = quote(.ns$getDefaultSessionData()),
+                        package_data = quote(.ns$getDefaultPackageData()),
+                        global_data = quote(.ns$getDefaultDataRepository()))[args]
             eval(as.call(args))
           }
 

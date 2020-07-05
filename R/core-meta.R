@@ -122,7 +122,7 @@ load_meta <- function(meta_type, project_name, subject_code, subject_id, meta_na
       # check blocks
       preprocess_yaml = file.path(meta_dir, '..', 'preprocess', 'rave.yaml')
       if(file.exists(preprocess_yaml)){
-        preproc_info = yaml::read_yaml(preprocess_yaml)
+        preproc_info = raveutils::load_yaml(preprocess_yaml)
         if(length(preproc_info$blocks)){
           pass_test = TRUE
           # let's check block!
@@ -166,8 +166,8 @@ load_meta <- function(meta_type, project_name, subject_code, subject_id, meta_na
     }
     else if(meta_type == 'info'){
       info_file = file.path(meta_dir, 'info.yaml')
-      info = yaml::yaml.load_file(info_file)
-      return(info)
+      info = raveutils::load_yaml(info_file)
+      return(as.list(info))
     }
     else if(meta_type == 'time_excluded'){
       file = file.path(meta_dir, 'time_excluded.csv')

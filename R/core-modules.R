@@ -99,7 +99,7 @@ find_modules <- function(packages){
   module_csv <- rave_options("module_lookup_file")
   if(file.exists(module_csv)){
     tryCatch({
-      mtbl <- read.csv(module_csv, colClasses = 'character')
+      mtbl <- utils::read.csv(module_csv, colClasses = 'character')
       exist_names <- col_names %in% colnames(mtbl)
       tmp_names <- col_names[exist_names]
       mtbl <- mtbl[, tmp_names]
@@ -137,7 +137,7 @@ find_modules <- function(packages){
     as.data.frame(minfo)
   })
   minfos <- do.call('rbind', unname(minfos))
-  minfos <- minfos[complete.cases(minfos),]
+  minfos <- minfos[stats::complete.cases(minfos),]
   minfos <- minfos[order(minfos$order),]
   return(minfos)
 
@@ -146,7 +146,7 @@ find_modules <- function(packages){
 
 
 app_ui <- function(adapter, theme = 'purple', token = NULL){
-
+  req <- list()
   dipsaus::new_function2(alist(req=), {
     qstr = req$QUERY_STRING
     url_info = shiny::parseQueryString(qstr)
@@ -483,6 +483,7 @@ app_server_main <- function(input, output, session, adapter){
         }
         rm(ctx)
       }
+      adapter$containers <- containers
       return()
     }
 
@@ -513,8 +514,9 @@ app_server_main <- function(input, output, session, adapter){
 
 #' @export
 start_rave <- function(host = '127.0.0.1', port = NULL, launch_browser=TRUE,
-                       test_mode = FALSE, token = NULL, theme = 'purple'){
-  adapter <- dipsaus::fastmap2()
+                       test_mode = FALSE, token = NULL, theme = 'purple',
+                       .adapter = dipsaus::fastmap2()){
+  adapter <- .adapter
   adapter$test.mode = isTRUE(test_mode)
   adapter$context <- raveutils::rave_context()
   adapter$active_session <- 0L

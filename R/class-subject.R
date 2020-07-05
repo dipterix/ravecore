@@ -86,6 +86,25 @@ RAVESubject <- R6::R6Class(
       }
       ref_table = private$.reference_tables[[reference_name]]
       as.integer(ref_table$Electrode[ref_table$Reference != ''])
+    },
+
+    initialize_paths = function(include_freesurfer = TRUE){
+      raveutils::dir_create(self$rave_path)
+      raveutils::dir_create(self$preprocess_path)
+      raveutils::dir_create(self$data_path)
+      raveutils::dir_create(self$reference_path)
+      raveutils::dir_create(self$cache_path)
+      raveutils::dir_create(self$meta_path)
+
+      # save preprocess
+      self$preprocess_settings$save()
+
+      if(include_freesurfer){
+        if(is.na(self$freesurfer_path) || !dir.exists(self$freesurfer_path)){
+          path <- file.path(self$path, 'fs')
+          raveutils::dir_create(path)
+        }
+      }
     }
 
   ),

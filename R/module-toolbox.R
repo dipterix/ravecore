@@ -21,11 +21,14 @@ auto_recalculate.rave_running <- function(on){
       on = as.numeric(on)
       if(on <= 0){
         raveutils::rave_info('[{instance$module_label}] Auto-recalculation is turned [OFF]')
+        instance$auto_run = on
+      } else if(instance$has_data){
+        raveutils::rave_info('[{instance$module_label}] Auto-recalculation is temporary on for {on} time(s)')
+        instance$auto_run = on
       } else {
-        raveutils::rave_info('[{instance$module_label}] Auto-recalculation is temporary on for {on} times')
+        # No data detected, no need to recalculate
+        instance$auto_run = 0
       }
-
-      instance$auto_run = on
     }
   }
   return(is.infinite(instance$auto_run))

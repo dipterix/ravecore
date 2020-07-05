@@ -98,6 +98,10 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
       if(!isTRUE(container$last_loaded == app_data$last_loaded)){
         initialize_module()
+        # If container auto recaluclate is false, force re-render outputs
+        if(!(container$auto_run > 0)){
+          local_reactives$render_output <- Sys.time()
+        }
       }
 
     }
@@ -125,7 +129,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   input_changed <- shiny::debounce(shiny::reactive({
     raveutils::rave_debug('Detected input change')
     local_reactives$input_changed
-  }), 300)
+  }), 50)
 
   render_outputs <- shiny::debounce(shiny::reactive({
     local_reactives$render_output
@@ -145,6 +149,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     list2env(input, envir = container$runtime_env)
   }
 
+  # Returns true/false whether main.R is terminated (false) or not (true)
   execute_main <- function(){
     if(!isTRUE(local_map$last_loaded == app_data$last_loaded)){
       raveutils::rave_info('Detect data change. Scheduled to re-run all blocks')
@@ -161,13 +166,26 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     }
 
     tryCatch({
+      # tryCatch({
+      #   stop(123)
+      # }, error = function(e){
+      #   raveutils::rave_fatal('asdasd')
+      # })
       container$`@run`(all = all)
-      container$auto_run = container$auto_run - 1
+      container$auto_run <- container$auto_run - 1
       local_map$data_changed = FALSE
+      TRUE
+    }, raveExitMain = function(e){
+      raveutils::rave_debug('Module early terminated main.R.')
+      FALSE
     }, error = function(e){
+      raveutils::rave_debug('Module run into error.')
       raveutils::rave_error(e$message)
+      FALSE
+    }, raveFatal = function(e){
+      raveutils::rave_debug('Module run into error. Debug information is highlighted above.')
+      FALSE
     })
-
   }
 
 
@@ -180,7 +198,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       raveutils::rave_info('[{container$module_label}] Waiting for instialization')
       return()
     }
-    raveutils::rave_info('Module has data [{container$has_data}] and initialized [{local_reactives$initialized}]')
+    raveutils::rave_debug('Module has data [{container$has_data}] and initialized [{local_reactives$initialized}]')
     # Run main!!! finally
 
     calibrate_inputs()
@@ -190,17 +208,24 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     update_levels = local_map$input_update_level
     if(update_levels >= 2){
       # will require run main.R
+      succeed <- TRUE
       if(container$auto_run <= 0){
         raveutils::rave_debug("auto-run is off, only render outputs")
       } else {
-        shiny::isolate(execute_main())
+        # shiny::isolate(execute_main())
+        succeed <- execute_main()
       }
-      local_reactives$render_output = Sys.time()
+      # TODO: Re-think whether early terminate main.R should result in
+      # output being re-rendered?
+      if( succeed ){
+        local_reactives$render_output = Sys.time()
+      }
     } else if (update_levels == 1){
       raveutils::rave_debug("[{container$module_label}] No input that affects main.R detected, re-render outputs")
       # only render
       local_reactives$render_output = Sys.time()
     }
+    local_map$input_update_level <- 0
   }, priority = -999, label = sprintf('rave-main-%s', container$module_id))
 
 
@@ -238,7 +263,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       container$close_data_selector(session = session)
       # dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..',
       #                          value = Sys.time(), priority = 'event')
-      container$container_reactives$..rave_data_loaded..
+      container$container_reactives$..rave_data_loaded.. <- Sys.time()
     } else {
       container$open_data_selector(session = session)
       container$run_loader_interface(session = session)
@@ -283,7 +308,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     base::print(local_reactives$initialized)
     base::print(container$container_reactives$..rave_import_data_ui_show..)
 
-    raveutils::rave_info('Showing data panel')
+    raveutils::rave_info('Rendering data panel')
     modal_info <- container$`@display_loader`()
     est_loadtime <- modal_info$expectedloadingtime
     if(length(est_loadtime) == 1){

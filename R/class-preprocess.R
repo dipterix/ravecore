@@ -242,6 +242,44 @@ RAVEPreprocessSettings <- R6::R6Class(
         }
         type
       }, FUN.VALUE = 'LFP')
+    },
+
+    `@freeze_blocks` = function(){
+      tmp <- self$data_imported
+      if(length(tmp) && any(tmp)){
+        return(TRUE)
+      } else {
+        return(FALSE)
+      }
+    },
+
+    `@freeze_lfp` = function(){
+      is_lfp <- (self$electrode_types == 'LFP')
+      if(length(is_lfp) && any(self$data_imported[is_lfp])){
+        return(TRUE)
+      } else{
+        return(FALSE)
+      }
+    },
+
+    `@lfp_sample_rate` = function(){
+      is_lfp <- (self$electrode_types == 'LFP')
+      if(length(is_lfp) && any(is_lfp)){
+        self$sample_rates[is_lfp][[1]]
+      } else {
+        NA
+      }
+
+    },
+
+    all_blocks = function(){
+      blk <- list.dirs(self$raw_path, full.names = FALSE, recursive = FALSE)
+      sort(unique(c(self$blocks, blk)))
+    },
+
+    raw_path = function(){
+      file.path(ravecore::rave_options('raw_data_dir'), self$subject$subject_code)
     }
+
   )
 )
