@@ -1,5 +1,9 @@
 #' @importFrom dipsaus %?<-%
-#' @import raveutils
+#' @importFrom dipsaus do_nothing
+#' @importFrom dipsaus add_to_session
+#' @importFrom dipsaus clear_env
+#' @importFrom dipsaus shiny_is_running
+#' @import raveio
 #' @useDynLib ravecore, .registration = TRUE
 NULL
 
@@ -34,5 +38,4 @@ hard_deprecated <- function(){
 
 # --------------------------------- Misc -------------------------------
 
-do_nothing <- function(...){}
-
+dir_create <- raveio::dir_create2

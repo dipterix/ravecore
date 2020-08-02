@@ -1,3 +1,4 @@
+#' Abstract definition of electrode class in RAVE
 #' @export
 RAVEAbstarctElectrode <- R6::R6Class(
   classname = 'RAVEAbstarctElectrode',
@@ -7,18 +8,39 @@ RAVEAbstarctElectrode <- R6::R6Class(
     reference_cachename = character(0)
   ),
   public = list(
+
+    #' @field type type of electrode
     type = 'Electrode',
+
+    #' @field subject subject instance (\code{\link{RAVESubject}})
     subject = NULL,
+
+    #' @field number integer stands for electrode number or reference ID
     number = NULL,
+
+    #' @field reference reference electrode, either \code{NULL} for no reference
+    #' or an electrode instance inherits \code{RAVEAbstarctElectrode}
     reference = NULL,
+
+    #' @field epoch a \code{\link{RAVEEpoch}} instance
     epoch = NULL,
+
+    #' @field cached_reference character, refer to current cached reference
     cached_reference = NULL,
+
+    #' @field is_reference whether this instance is a reference electrode
     is_reference = FALSE,
 
+    #' @description set cache name, internally used
+    #' @param name character, internally used
     .set_cachename = function(name){
       private$reference_cachename = name
     },
 
+    #' @description constructor
+    #' @param subject character or \code{\link{RAVESubject}} instance
+    #' @param number current electrode number or reference ID
+    #' @param is_reference whether instance is a reference
     initialize = function(subject, number, is_reference = FALSE){
       self$subject = ravecore::as_rave_subject(subject)
       self$number = number
@@ -29,13 +51,18 @@ RAVEAbstarctElectrode <- R6::R6Class(
       # load cached references
       cache_table = file.path(self$subject$cache_path, 'cached_reference.csv')
       if(file.exists(cache_table)){
-        cache_table = raveutils::safe_read_csv(cache_table)
+        cache_table = safe_read_csv(cache_table)
         self$cached_reference = cache_table$Reference[cache_table$Electrode == number]
       } else {
-        raveutils::rave_error('Cannot find cached_reference.csv')
+        rave_error('Cannot find cached_reference.csv')
       }
 
     },
+
+    #' @description set reference for instance
+    #' @param reference \code{NULL} or \code{RAVEAbstarctElectrode} instance
+    #' @param type reference electrode type, default is the same as current
+    #' instance
     .set_reference = function(reference, type){
       if(missing(type)){
         type = self$type
@@ -50,6 +77,10 @@ RAVEAbstarctElectrode <- R6::R6Class(
 
       self$reference = reference
     },
+
+    #' @description set epoch instance for the electrode
+    #' @param epoch characters or \code{\link{RAVEEpoch}} instance. For
+    #' characters, make sure \code{"epoch_<name>.csv"} is in meta folder.
     set_epoch = function(epoch){
       if(!inherits(epoch, 'RAVEEpoch')){
         epoch = RAVEEpoch$new(subject = self$subject, name = epoch)
@@ -57,20 +88,33 @@ RAVEAbstarctElectrode <- R6::R6Class(
       self$epoch = epoch
     },
 
+    #' @description method to clear cache on hard drive
+    #' @param ... passed to child instances
     clear_cache = function(...){},
+
+    #' @description method to clear memory
+    #' @param ... passed to child instances
     clear_memory = function(...){}
 
   ),
   active = list(
+
+    #' @field exists whether electrode exists in subject
     exists = function(){
       self$number %in% self$subject$electrodes
     },
+
+    #' @field preprocess_file path to preprocess 'HDF5' file
     preprocess_file = function(){
       file.path(self$subject$preprocess_path, sprintf('electrode_%s.h5', self$number))
     },
+
+    #' @field power_file path to power 'HDF5' file
     power_file = function(){
       file.path(self$subject$data_path, 'power', sprintf('%s.h5', self$number))
     },
+
+    #' @field power_cached path to power 'FST' file
     power_cached = function(){
       if(is.null(self$reference) || self$reference$number == 'noref'){
         # check if raw exists
@@ -78,12 +122,18 @@ RAVEAbstarctElectrode <- R6::R6Class(
       }
       self$cached_reference
     },
+
+    #' @field phase_file path to phase 'HDF5' file
     phase_file = function(){
       file.path(self$subject$data_path, 'phase', sprintf('%s.h5', self$number))
     },
+
+    #' @field voltage_file path to voltage 'HDF5' file
     voltage_file = function(){
       file.path(self$subject$data_path, 'voltage', sprintf('%s.h5', self$number))
     },
+
+    #' @field reference_name reference electrode name (field: number)
     reference_name = function(){
       if(is.null(self$reference)){
         'noref'
@@ -92,6 +142,8 @@ RAVEAbstarctElectrode <- R6::R6Class(
         sprintf('ref_%s', ref)
       }
     },
+
+    #' @field cache_path run-time cache path; \code{NA} if epoch is missing
     cache_path = function(){
       if(!length(self$epoch)){
         return(NA)
@@ -107,6 +159,48 @@ RAVEAbstarctElectrode <- R6::R6Class(
   )
 )
 
+#' Definition for 'LFP' electrodes
+#'
+#' @examples
+#' \dontrun{
+#'
+#' # Download demo subject KC
+#'
+#' # Electrode 14
+#' e <- LFP_electrode$new(subject = 'demo/DemoSubject',
+#'                        number = 14, is_reference = FALSE)
+#'
+#' # Reference "ref_13-16,24"
+#' ref <- LFP_electrode$new(subject = 'demo/DemoSubject',
+#'                          number = "ref_13-16,24", is_reference = TRUE)
+#'
+#' # ------ Reference ------
+#' # By default there is no reference
+#' e$reference_name     # "noref
+#'
+#' # set reference
+#' e$set_reference(reference = ref)
+#' e$reference_name     # "ref_13-16,24"
+#'
+#' # Set epoch
+#' e$set_epoch(epoch = 'auditory_onset')
+#'
+#' # Now epoch power
+#' power <- e$epoch_power(before_onset = 1, after_onset = 2)
+#'
+#' # Trial x Frequency x Time x Electrodes
+#' power
+#'
+#' # Subset power
+#' subset(power, Time ~ Time < 0, Electrode ~ Electrode == 14)
+#'
+#' # clear memory in RAM and cache on hard disk
+#' e$clear_cache()
+#' e$clear_memory()
+#'
+#'
+#' }
+#'
 #' @export
 LFP_electrode <- R6::R6Class(
   classname = 'LFP_electrode',
@@ -120,11 +214,19 @@ LFP_electrode <- R6::R6Class(
     referenced_power_cache_file = character(0)
   ),
   public = list(
+
+    #' @field type type of electrode
     type = 'LFP',
+
+    #' @description set reference for current electrode
+    #' @param reference either \code{NULL} or \code{LFP_electrode} instance
     set_reference = function(reference){
       self$.set_reference(reference)
     },
 
+    #' @description constructor
+    #' @param subject,number,is_reference see constructor in
+    #' \code{\link{RAVEAbstarctElectrode}}
     initialize = function(subject, number, is_reference = FALSE){
       super$initialize(subject, number, is_reference)
       if(is_reference){
@@ -147,7 +249,7 @@ LFP_electrode <- R6::R6Class(
             # check subject reference directory
             self$number = sprintf('ref_%s.h5', ref_electrodes)
             if(!file.exists(file.path(self$subject$reference_path, self$number))){
-              raveutils::rave_warn("Reference file {self$number} is missing")
+              rave_warn("Reference file {self$number} is missing")
             }
           }
         }
@@ -156,6 +258,12 @@ LFP_electrode <- R6::R6Class(
     },
 
     # data method
+
+    #' @description load voltage data, un-referenced
+    #' @param block experiment block
+    #' @param persist whether to persist in the instance, default is false,
+    #' however, if this function will be called multiple times, set it to true.
+    #' @return voltage data before reference
     load_unreferenced_voltage = function(block, persist = FALSE){
       stopifnot2(block %in% self$subject$blocks, msg = sprintf(
         'Block %s doesn not exists', block
@@ -178,7 +286,7 @@ LFP_electrode <- R6::R6Class(
         h5_path = file.path(self$subject$data_path, 'voltage', self$h5_fname)
         h5_name = sprintf('/raw/voltage/%s', block)
 
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -192,7 +300,7 @@ LFP_electrode <- R6::R6Class(
         # load from reference folder
         h5_path = file.path(self$subject$reference_path, self$h5_fname)
         h5_name = sprintf('/voltage/%s', block)
-        re = raveutils::load_h5(h5_path, h5_name, read_only = TRUE, ram = FALSE)
+        re = load_h5(h5_path, h5_name, read_only = TRUE, ram = FALSE)
       }
 
       if(persist){
@@ -203,6 +311,12 @@ LFP_electrode <- R6::R6Class(
       re
 
     },
+
+    #' @description load power data, un-referenced
+    #' @param block experiment block
+    #' @param persist whether to persist in the instance, default is false,
+    #' however, if this function will be called multiple times, set it to true.
+    #' @return power data before reference
     load_unreferenced_power = function(block, persist = FALSE){
       stopifnot2(block %in% self$subject$blocks, msg = sprintf(
         'Block %s doesn not exists', block
@@ -224,7 +338,7 @@ LFP_electrode <- R6::R6Class(
         h5_path = file.path(self$subject$data_path, 'power', self$h5_fname)
         h5_name = sprintf('/raw/power/%s', block)
 
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -236,13 +350,13 @@ LFP_electrode <- R6::R6Class(
           return(0)
         }
         if(!persist){
-          raveutils::rave_fatal('load_unreferenced_power is not for reference_electrode unless persist is TRUE')
+          rave_fatal('load_unreferenced_power is not for reference_electrode unless persist is TRUE')
         }
 
         # load from reference folder
         h5_path = file.path(self$subject$reference_path, self$h5_fname)
         h5_name = sprintf('/wavelet/coef/%s', block)
-        re = raveutils::load_h5(h5_path, h5_name, read_only = TRUE, ram = TRUE)
+        re = load_h5(h5_path, h5_name, read_only = TRUE, ram = TRUE)
 
         re = re[,,1, drop = FALSE] ^ 2
         dim(re) = dim(re)[1:2]
@@ -259,6 +373,12 @@ LFP_electrode <- R6::R6Class(
       re
 
     },
+
+    #' @description load phase data, un-referenced
+    #' @param block experiment block
+    #' @param persist whether to persist in the instance, default is false,
+    #' however, if this function will be called multiple times, set it to true.
+    #' @return phase data before reference
     load_unreferenced_phase = function(block, persist = FALSE){
       stopifnot2(block %in% self$subject$blocks, msg = sprintf(
         'Block %s doesn not exists', block
@@ -280,7 +400,7 @@ LFP_electrode <- R6::R6Class(
         h5_path = file.path(self$subject$data_path, 'phase', self$h5_fname)
         h5_name = sprintf('/raw/phase/%s', block)
 
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -292,13 +412,13 @@ LFP_electrode <- R6::R6Class(
           return(0)
         }
         if(!persist){
-          raveutils::rave_fatal('load_unreferenced_phase is not for reference_electrode unless persist is TRUE')
+          rave_fatal('load_unreferenced_phase is not for reference_electrode unless persist is TRUE')
         }
 
         # load from reference folder
         h5_path = file.path(self$subject$reference_path, self$h5_fname)
         h5_name = sprintf('/wavelet/coef/%s', block)
-        re = raveutils::load_h5(h5_path, h5_name, read_only = TRUE, ram = TRUE)
+        re = load_h5(h5_path, h5_name, read_only = TRUE, ram = TRUE)
 
         re = re[,,2, drop = FALSE]
         dim(re) = dim(re)[1:2]
@@ -317,6 +437,10 @@ LFP_electrode <- R6::R6Class(
     },
 
     # reference
+
+    #' @description reference power for given block
+    #' @param block character, experiment block
+    #' @return referenced power
     reference_power = function(block){
       # check whether the reference has been cached
       stopifnot2(!self$is_reference, msg = 'Cannot reference a reference ;D')
@@ -331,7 +455,7 @@ LFP_electrode <- R6::R6Class(
         fst_path = file.path(self$subject$cache_path, 'power', 'ref', block, self$fst_fname)
         h5_path = file.path(self$subject$data_path, 'power', self$h5_fname)
         h5_name = sprintf('/ref/power/%s', block)
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -351,6 +475,10 @@ LFP_electrode <- R6::R6Class(
 
       re
     },
+
+    #' @description reference phase for given block
+    #' @param block character, experiment block
+    #' @return referenced phase
     reference_phase = function(block){
       # check whether the reference has been cached
       stopifnot2(!self$is_reference, msg = 'Cannot reference a reference ;D')
@@ -364,7 +492,7 @@ LFP_electrode <- R6::R6Class(
         fst_path = file.path(self$subject$cache_path, 'phase', 'ref', block, self$fst_fname)
         h5_path = file.path(self$subject$data_path, 'phase', self$h5_fname)
         h5_name = sprintf('/ref/phase/%s', block)
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -384,6 +512,10 @@ LFP_electrode <- R6::R6Class(
 
       re
     },
+
+    #' @description reference voltage for given block
+    #' @param block character, experiment block
+    #' @return referenced voltage
     reference_voltage = function(block){
       # check whether the reference has been cached
       stopifnot2(!self$is_reference, msg = 'Cannot reference a reference ;D')
@@ -397,7 +529,7 @@ LFP_electrode <- R6::R6Class(
         fst_path = file.path(self$subject$cache_path, 'voltage', 'ref', block, self$fst_fname)
         h5_path = file.path(self$subject$data_path, 'voltage', self$h5_fname)
         h5_name = sprintf('/ref/voltage/%s', block)
-        re = raveutils::load_fst_or_h5(
+        re = load_fst_or_h5(
           fst_path = fst_path,
           h5_path = h5_path, h5_name = h5_name,
           fst_need_transpose = TRUE,
@@ -414,6 +546,10 @@ LFP_electrode <- R6::R6Class(
       re
     },
 
+    #' @description check whether power is cached in run-time set-ups
+    #' @param before_onset seconds before trial onset
+    #' @param after_onset seconds after trial onset
+    #' @return logical whether power has been cached in a \code{lazyarray}
     is_power_cached = function(before_onset, after_onset){
       stopifnot2(inherits(self$epoch, 'RAVEEpoch'), msg = 'You need to set electrode epoch first')
       preproc = self$preprocess_info
@@ -440,6 +576,11 @@ LFP_electrode <- R6::R6Class(
     },
 
     # epoch
+
+    #' @description perform epoch on power with epoch and reference
+    #' @param before_onset seconds before trial onset
+    #' @param after_onset seconds after trial onset
+    #' @return An \code{lazyarray} object that can be subset like normal arrays
     epoch_power = function(before_onset, after_onset){
       stopifnot2(inherits(self$epoch, 'RAVEEpoch'), msg = 'You need to set electrode epoch first')
       preproc = self$preprocess_info
@@ -473,7 +614,7 @@ LFP_electrode <- R6::R6Class(
                                       dimnames = dimnames, multipart = TRUE, prefix = '',
                                       compress_level = 0L, multipart_mode = 1L)
         }, error = function(e){
-          raveutils::rave_debug('Cache path already exists - {dir}')
+          rave_debug('Cache path already exists - {dir}')
           lazyarray::load_lazyarray(path = dir, read_only = FALSE)
         })
       }
@@ -512,12 +653,19 @@ LFP_electrode <- R6::R6Class(
       return(lazyarray::load_lazyarray(path = dir, read_only = TRUE))
 
     },
+
+    #' @description method to clear cache on hard drive
+    #' @param ... ignored
+
     clear_cache = function(...){
       f = private$referenced_power_cache_file
       if(length(f) && file.exists(f)){
         unlink(f)
       }
     },
+
+    #' @description method to clear memory
+    #' @param ... ignored
     clear_memory = function(...){
       private$persisted_voltage_unref = NULL
       private$persisted_power_unref = NULL
@@ -530,7 +678,7 @@ LFP_electrode <- R6::R6Class(
 
   ),
   active = list(
-    # file exists?
+    #' @field exists whether electrode exists in subject
     exists = function(){
       if(!self$is_reference || is.numeric(self$number)){
         super$exists
@@ -541,6 +689,7 @@ LFP_electrode <- R6::R6Class(
       }
     },
 
+    #' @field h5_fname 'HDF5' file name
     h5_fname = function(){
       if(is.character(self$number)){
         self$number
@@ -548,6 +697,8 @@ LFP_electrode <- R6::R6Class(
         sprintf('%s.h5', self$number)
       }
     },
+
+    #' @field fst_fname 'FST' file name
     fst_fname = function(){
       if(is.character(self$number)){
         self$number
@@ -556,6 +707,8 @@ LFP_electrode <- R6::R6Class(
       }
     },
 
+    #' @field reference_equals_cached whether referenced data has been cached
+    #' in 'RAVE' folder
     reference_equals_cached = function(){
       if(self$is_reference){
         return(TRUE)
@@ -569,7 +722,9 @@ LFP_electrode <- R6::R6Class(
       has_cached
     },
 
-    # valid?
+    #' @field valid whether current electrode is valid: subject exists and
+    #' contains current electrode or reference; subject electrode type matches
+    #' with current electrode type
     valid = function(){
       if(!self$exists) {return(FALSE)}
       if(self$is_reference) {return(TRUE)}
@@ -581,6 +736,8 @@ LFP_electrode <- R6::R6Class(
       }
       return(TRUE)
     },
+
+    #' @field raw_sample_rate voltage sample rate
     raw_sample_rate = function(){
       elec = self$subject$electrodes
       srate = self$subject$raw_sample_rates[elec %in% self$number]
@@ -589,6 +746,8 @@ LFP_electrode <- R6::R6Class(
       }
       srate
     },
+
+    #' @field power_sample_rate power/phase sample rate
     power_sample_rate = function(){
       elec = self$subject$electrodes
       srate = self$subject$power_sample_rate[elec %in% self$number]
@@ -597,6 +756,8 @@ LFP_electrode <- R6::R6Class(
       }
       srate
     },
+
+    #' @field preprocess_info preprocess information
     preprocess_info = function(){
       self$subject$preprocess_settings$electrode_info(electrode = self$number)
     }

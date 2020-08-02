@@ -6,10 +6,10 @@ define_input_multiple_electrodes <- function(inputId, label = 'Electrodes'){
       init_expr = {
 
         electrodes = global_data$loaded_electrodes
-        
-        
-        last_input = raveutils::get_val2(session_data, 
-                                         key = !!inputId, 
+
+
+        last_input = raveio::get_val2(session_data,
+                                         key = !!inputId,
                                          default = as.character(electrodes[1]),
                                          min_len = 1, max_len = 1)
         e = dipsaus::parse_svec(last_input)
@@ -35,7 +35,7 @@ define_input_single_electrode <- function(inputId, label = 'Electrode'){
       definition = selectInput(!!inputId, !!label, choices = '', selected = NULL, multiple = FALSE),
       init_args = c('choices', 'selected'),
       init_expr = {
-        
+
         electrodes = global_data$loaded_electrodes
         choices = as.character(electrodes)
 
@@ -129,39 +129,39 @@ define_input_time <- function(inputId, label = 'Time Range', is_range = TRUE, ro
 
 
 
-define_input_auto_recalculate <- function(inputId, label, 
-                                          type = c('checkbox', 'button'), 
-                                          button_type = 'primary', 
+define_input_auto_recalculate <- function(inputId, label,
+                                          type = c('checkbox', 'button'),
+                                          button_type = 'primary',
                                           default_on = FALSE){
   type = match.arg(type)
-  
+
   quo = rlang::quo({
-    
+
     if(!!(type == 'checkbox')){
       define_input(shiny::checkboxInput(!!inputId, label = !!label, value = !!default_on))
-      
+
       load_scripts(rlang::quo({
-        
+
         if(isFALSE(!!default_on)){
           ravecore::auto_recalculate(FALSE)
         }
-        
+
         observeEvent(input[[!!inputId]], {
           is_on = input[[!!inputId]]
           ravecore::auto_recalculate(isTRUE(is_on))
           reactive_data$..rave_auto_recalculate.. = if(is_on) Sys.time() else FALSE
         }, priority = 999999L)
       }))
-      
+
     } else {
       define_input(dipsaus::actionButtonStyled(
-        !!inputId, label = !!label, value = !!default_on, 
+        !!inputId, label = !!label, value = !!default_on,
         type = !!button_type, width = '100%', icon = shiny::icon('arrow-right')))
-      
+
       load_scripts(rlang::quo({
         observeEvent(reactive_data$..rave_auto_recalculate.., {
           assign('aaaa', environment(), envir = globalenv())
-          
+
           if(isFALSE(reactive_data$..rave_auto_recalculate..)){
             dipsaus::updateActionButtonStyled(session, !!inputId, disabled = FALSE)
           } else {
@@ -176,8 +176,8 @@ define_input_auto_recalculate <- function(inputId, label,
   })
   parent_env = parent.frame()
   dipsaus::eval_dirty(quo, env = parent_env)
-  
-  
+
+
 }
 
 
@@ -189,32 +189,32 @@ define_input_auto_recalculate <- function(inputId, label,
 define_input_condition_groups <- function(
   inputId, label = 'Group', initial_groups = 1, max_group = 10, min_group = 1,
   label_color = rep('black', max_group), init_args, init_expr, quoted = FALSE, ...){
-  
+
   if(missing(init_args)){
     init_args = c('initialization', 'value')
   }
   # dipsaus::registerCompoundInput2()
-  
+
   if(missing(init_expr)){
     init_expr = rlang::quo({
-      
+
       cond = unique(global_data$repository$epoch$table$Condition)
-      
+
       initialization = list(
         group_conditions = list(
           choices = cond
         )
       )
-      
+
       default_val = list(
         list(
           group_name = 'All Conditions',
           group_conditions = cond
         )
       )
-      
-      value = raveutils::get_val2(session_data, key = !!inputId, default = default_val, min_len = 1)
-      if( !length(value) || !length(value[[1]]$group_conditions) || 
+
+      value = raveio::get_val2(session_data, key = !!inputId, default = default_val, min_len = 1)
+      if( !length(value) || !length(value[[1]]$group_conditions) ||
           !any(value[[1]]$group_conditions %in% cond)){
         value = default_val
       }
@@ -223,27 +223,27 @@ define_input_condition_groups <- function(
   }else if (!quoted){
     init_expr = substitute(init_expr)
   }
-  
+
   quo = rlang::quo({
-    
+
     define_input(
       definition = dipsaus::compoundInput2(
-        inputId = !!inputId, label = !!label, inital_ncomp = !!initial_groups, 
+        inputId = !!inputId, label = !!label, inital_ncomp = !!initial_groups,
         components = shiny::div(
           textInput('group_name', 'Name', value = '', placeholder = 'Condition Name'),
           selectInput('group_conditions', ' ', choices = '', multiple = TRUE)
         ),
         label_color = !!label_color, max_ncomp = !!max_group, min_group = !!min_group
       ),
-      
+
       init_args = !!init_args,
-      
+
       init_expr = eval(!!init_expr)
     )
   })
-  
+
   parent_frame = parent.frame()
-  
+
   dipsaus::eval_dirty(quo, env = parent_frame)
 }
 
@@ -254,7 +254,7 @@ define_input_condition_groups <- function(
 
 # options to save and load analysis parameters
 define_input_analysis_yaml_chooser <- function(
-  inputId, name_prefix = 'settings_', 
+  inputId, name_prefix = 'settings_',
   # Relative to project directory
   read_path, write_path = read_path,
   labels = c('Save settings', 'Load settings')
@@ -268,7 +268,7 @@ define_input_analysis_yaml_chooser <- function(
       assign(!!inputId, function(){
         project_name = global_data$repository$subject$project_name
         data_dir = rave_options('data_dir')
-        
+
         defaultPath = do.call(file.path, as.list(c(project_name, '_project_data', !!read_path)))
         dir.create(file.path(data_dir, defaultPath), showWarnings = FALSE, recursive = TRUE)
         defaultPath = normalizePath(defaultPath)
@@ -278,7 +278,7 @@ define_input_analysis_yaml_chooser <- function(
           filetypes = c('yaml', 'yml'), defaultRoot = 'RAVE Home',
           defaultPath = defaultPath
         )
-        
+
         div(
           class = 'rave-grid-inputs', style='border:none',
           div(
@@ -293,8 +293,8 @@ define_input_analysis_yaml_chooser <- function(
           )
         )
       })
-      
-      if(raveutils::shiny_is_running()){
+
+      if(dipsaus::shiny_is_running()){
         local({
           input <- ravecore::getDefaultReactiveInput()
           save_inputs <- function(yaml_path, variables_to_export){
@@ -302,14 +302,14 @@ define_input_analysis_yaml_chooser <- function(
             if(!missing(variables_to_export)) {
               cache_list =cache_list[variables_to_export]
             }
-            raveutils::save_yaml(x = cache_list, file = yaml_path)
+            raveio::save_yaml(x = cache_list, file = yaml_path)
             return(TRUE)
           }
-          
+
           # save Modal pop up
           observeEvent(input[[!!save_btn]], {
             tstmp <- strftime(Sys.time(), format = '%Y-%h-%d')
-            
+
             shiny::showModal(shiny::modalDialog(
               title = 'Save Analysis Settings',
               size = 's',
@@ -322,7 +322,7 @@ define_input_analysis_yaml_chooser <- function(
               )
             ))
           })
-          
+
           # Modal do save
           observeEvent(input[[!!do_save]], {
             # save
@@ -336,13 +336,13 @@ define_input_analysis_yaml_chooser <- function(
           })
         })
       }
-      
+
     }))
-    
+
     define_input(customizedUI(inputId = !!inputId))
-    
+
   })
-  
+
   parent_env = parent.frame()
   eval_dirty(quo, env = parent_env)
 }

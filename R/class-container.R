@@ -48,7 +48,7 @@ RAVEContainer <- R6::R6Class(
     .data_selector_opened = FALSE,
 
     open_data_selector = function(session = shiny::getDefaultReactiveDomain()){
-      raveutils::rave_debug('Opening data selector')
+      rave_debug('Opening data selector')
       session$sendCustomMessage(type = 'rave_add_class',message = list(
         selector = sprintf('.rave-module-container[rave-module="%s"]', self$module_id),
         class = 'open'
@@ -95,15 +95,15 @@ RAVEContainer <- R6::R6Class(
         }, rave_check_error = function(e){
           # only captures rave_check_error
           private$error_list[[e$message]] <- e
-          raveutils::rave_info('\r[Module Validation]: {e$message}')
+          rave_info('\r[Module Validation]: {e$message}')
         }, error = function(e){
-          raveutils::rave_error("Captured unknown error: {e$message} in call:")
+          rave_error("Captured unknown error: {e$message} in call:")
           traceback(e)
           private$error_list[[e$message]] <- e
         })
       }
       if(length(private$error_list)){
-        raveutils::rave_debug('{self$module_label} needs to load more data...')
+        rave_debug('{self$module_label} needs to load more data...')
         self$has_data <- FALSE
         # self$`@set_data_status`(FALSE)
       } else {
@@ -161,7 +161,7 @@ RAVEContainer <- R6::R6Class(
       on.exit({
         dipsaus::updateActionButtonStyled(session, '..rave_import_data_btn..', disabled = FALSE)
       })
-      raveutils::rave_info("Loading start...")
+      rave_info("Loading start...")
 
       tryCatch({
         private$onload_action(self$container_data, self$module$package_data, getDefaultDataRepository())
@@ -176,8 +176,8 @@ RAVEContainer <- R6::R6Class(
 
         self$close_data_selector()
       }, error = function(e){
-        raveutils::rave_error(e$message)
-        raveutils::rave_debug('[Module ERROR] Failures while loading data')
+        rave_error(e$message)
+        rave_debug('[Module ERROR] Failures while loading data')
         base::print(private$onload_action)
       })
     },
@@ -216,21 +216,21 @@ RAVEContainer <- R6::R6Class(
       if(!quoted){
         expr = substitute(expr)
       }
-      raveutils::with_rave_context(
+      with_rave_context(
         context, expr, package = self$package, module_id = self$module_id,
         instance = self, quoted = TRUE, env = envir)
-      # ctx <- raveutils::rave_context()
+      # ctx <- rave_context()
       # on.exit({
-      #   raveutils::rave_context(ctx$context, ctx$package, ctx$module_id, ctx$instance)
+      #   rave_context(ctx$context, ctx$package, ctx$module_id, ctx$instance)
       # }, add = TRUE, after = TRUE)
-      # raveutils::rave_context(context, self$package, self$module_id, self)
+      # rave_context(context, self$package, self$module_id, self)
     },
 
     register_context = function(context){
       if(missing(context)){
-        context = raveutils::from_rave_context('context')
+        context = from_rave_context('context')
       }
-      invisible(raveutils::rave_context(context, self$package, self$module_id, self))
+      invisible(rave_context(context, self$package, self$module_id, self))
     },
 
     import_widgets = function(context = 'rave_compile'){
@@ -247,7 +247,7 @@ RAVEContainer <- R6::R6Class(
           })
         }
         list2env(as.list(self$runtime_env), envir = self$wrapper_env)
-        raveutils::clear_env(self$runtime_env)
+        clear_env(self$runtime_env)
       })
     },
 
@@ -329,7 +329,7 @@ RAVEContainer <- R6::R6Class(
           section_header = which(section_line)
           overhead = stringr::str_trim(script[seq_len(section_header[[1]] - 1)])
           if(!all(stringr::str_detect(overhead, '^#') || overhead == '')){
-            raveutils::rave_warn(
+            rave_warn(
               "There is overhead in main.R which will be ignored. Reasons:\n",
               "  You want to partition main.R using #' @section flags. ",
               "But you must comment any code before the first flag and starting anchor. \n",
@@ -377,7 +377,7 @@ RAVEContainer <- R6::R6Class(
     },
 
     `@register_shinysession` = function(session){
-      # ctx = raveutils::rave_context()
+      # ctx = rave_context()
       # if(ctx$context == 'rave_running' ){
       if(!is.null(session)){
         # Must be in correct context
@@ -434,7 +434,7 @@ RAVEContainer <- R6::R6Class(
               # base::print(re)
               re
             }, error = function(e){
-              raveutils::rave_debug('Error while digesting {lang}')
+              rave_debug('Error while digesting {lang}')
               cat(e$message, '\n')
             }))
           })
@@ -444,7 +444,7 @@ RAVEContainer <- R6::R6Class(
           if(!all && !ran && isTRUE(self$main_digests[[ii]] == digest)){
             # This part should be skipped
             timer = structure(dipsaus::time_delta(start_time, Sys.time()), unit = 's', class = 'rave-units')
-            raveutils::rave_debug('[{module_label}]: Part {ii}: {main_f$section} - no changes found, skipping... ({timer})')
+            rave_debug('[{module_label}]: Part {ii}: {main_f$section} - no changes found, skipping... ({timer})')
             next()
           } else {
             self$main_digests[[ii]] = digest
@@ -456,19 +456,19 @@ RAVEContainer <- R6::R6Class(
         tryCatch({
           dipsaus::eval_dirty(main_f$expr, env = self$runtime_env)
         }, error = function(e){
-          raveutils::rave_warn("Please check the following line:", style = 'fatal')
+          rave_warn("Please check the following line:", style = 'fatal')
           base::print(main_f$expr)
 
           base::print(e$call)
-          raveutils::rave_fatal('[{module_label}]: Part {ii}: Error found in section {sQuote(main_f$section)}:\n',
+          rave_fatal('[{module_label}]: Part {ii}: Error found in section {sQuote(main_f$section)}:\n',
                                 '  {e$message}\n', 'Please check the messages above for bug information.',
                                 call = 'See above messages')
         })
         timer = structure(dipsaus::time_delta(start_time, Sys.time()), unit = 's', class = 'rave-units')
-        raveutils::rave_debug('[{module_label}]: Part {ii}: {main_f$section} - finished ({timer})')
+        rave_debug('[{module_label}]: Part {ii}: {main_f$section} - finished ({timer})')
       }
       timer = structure(dipsaus::time_delta(init_time, Sys.time()), unit = 's', class = 'rave-units')
-      raveutils::rave_debug('[{module_label}]: finished main.R in {timer}, start rendering')
+      rave_debug('[{module_label}]: finished main.R in {timer}, start rendering')
     },
 
     `@invalidate` = function(...){
@@ -477,7 +477,7 @@ RAVEContainer <- R6::R6Class(
       # }
 
       # check context
-      # ctx <- raveutils::rave_context()
+      # ctx <- rave_context()
       # stopifnot2(identical(ctx$instance, self), msg = 'Context not set right')
 
     },
@@ -645,7 +645,7 @@ RAVEContainer <- R6::R6Class(
                                    self$module$package_data,
                                    getDefaultDataRepository())
         }, error = function(e){
-          raveutils::rave_error("Captured error: {e$message} in call:")
+          rave_error("Captured error: {e$message} in call:")
           traceback(e)
         })
       })
@@ -706,12 +706,12 @@ RAVEContainer <- R6::R6Class(
       if(!missing(v)){
         self$.has_data = !isFALSE(v)
         if(self$.has_data){
-          raveutils::rave_debug('Resuming module observers')
+          rave_debug('Resuming module observers')
           lapply(names(self$user_observers), function(nm){
             self$user_observers[[nm]]$resume()
           })
         } else {
-          raveutils::rave_debug('Stopping module observers')
+          rave_debug('Stopping module observers')
           lapply(names(self$user_observers), function(nm){
             self$user_observers[[nm]]$suspend()
           })

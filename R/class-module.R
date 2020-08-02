@@ -19,6 +19,7 @@ loaded_rave_packages <- function(package){
   rave_loaded_packages[[package]]
 }
 
+#' Definition for 'RAVE' package instance
 RAVEPackage <- R6::R6Class(
   classname = 'RAVEPackage',
   portable = FALSE,
@@ -26,19 +27,28 @@ RAVEPackage <- R6::R6Class(
   parent_env = asNamespace('ravecore'),
   lock_objects = FALSE, # FIXME
   public = list(
+
+    #' @field conf_path configuration path
     conf_path = character(0),
 
+    #' @field package_name R package name
     package_name = character(0),
+
+    #' @field package_data package data; see also \code{\link{getDefaultPackageData}}
     package_data = NULL,
+
+    #' @field package_env package name space
     package_env = NULL,
 
+    #' @description constructor
+    #' @param package 'RAVE' package name
     initialize = function(package){
       stopifnot2(requireNamespace(package, quietly = TRUE), msg = sprintf('Package [%s] not found', package))
-      context <- raveutils::from_rave_context('context')
+      context <- from_rave_context('context')
       if(context != 'rave_module_debug'){
         self$conf_path <- normalizePath(system.file('rave2.yaml', package = package), mustWork = TRUE)
       } else {
-        self$conf_path <- raveutils::package_file('inst/rave2.yaml')
+        self$conf_path <- package_file('inst/rave2.yaml')
       }
 
       self$package_name = package
@@ -48,6 +58,7 @@ RAVEPackage <- R6::R6Class(
   )
 )
 
+#' Definition for 'RAVE' module class
 #' @export
 RAVEModule <- R6::R6Class(
   classname = 'RAVEModule',
@@ -59,21 +70,41 @@ RAVEModule <- R6::R6Class(
     .package = NULL
   ),
   public = list(
+
+    #' @field debug whether module is in debug mode
     debug = FALSE,
 
+    #' @field package 'RAVE' module's package name
     package = character(0),
+
+    #' @field package_env package name space
     package_env = NULL,
+
+    #' @field package_config package configuration list
     package_config = NULL,
 
     # stores module ID shared data
+
+    #' @field module_id module ID string
     module_id = character(0),
+
+    #' @field module_label friendly display name
     module_label = character(0),
+
+    #' @field module_group module category
     module_group = character(0),
+
+    #' @field package_data list storing package key-values pairs
     package_data = NULL,
 
-    # stores execenv instances
+    #' @field containers stores run-time instances
     containers = NULL,
 
+    #' @description constructor
+    #' @param package character package name
+    #' @param module_id 'RAVE' module ID
+    #' @param force whether to force reload the source script
+    #' @param debug whether to set in debug mode
     initialize = function(package, module_id, force = FALSE, debug = FALSE){
 
       private$.package = loaded_rave_packages(package)
@@ -84,7 +115,7 @@ RAVEModule <- R6::R6Class(
 
       if(!is.null(rave_loaded_modules[[module_id]])){
         if(!force){
-          raveutils::rave_error("Trying to create a new module that has been loaded: {module_id}")
+          rave_error("Trying to create a new module that has been loaded: {module_id}")
         }
         old_module <- rave_loaded_modules[[module_id]]
         self$containers <- old_module$containers
@@ -98,7 +129,7 @@ RAVEModule <- R6::R6Class(
 
       # self$analyze_module()
       rave_conf = self$get_path('rave2.yaml')
-      self$package_config = raveutils::load_yaml(rave_conf)
+      self$package_config = load_yaml(rave_conf)
       for(conf in self$package_config$modules){
         if(conf$module_id == self$module_id){
           self$module_label = conf$module_label
@@ -108,13 +139,15 @@ RAVEModule <- R6::R6Class(
       }
     },
 
+    #' @description Add run-time container instance
+    #' @param session shiny session
     add_container = function(session = shiny::getDefaultReactiveDomain()){
       if(!inherits(session, c('ShinySession', 'session_proxy'))){
         # if session is NULL, then default global container
         rave_id <- 'global'
       } else {
         # if session is shiny session, check RAVE_ID
-        rave_id <- raveutils::add_to_session(session = session)
+        rave_id <- add_to_session(session = session)
       }
 
       # create new container
@@ -123,22 +156,27 @@ RAVEModule <- R6::R6Class(
       return(self$containers[[rave_id]])
     },
 
+    #' @description get script paths
+    #' @param path relative or absolute, behaves slightly different when
+    #' debugging modules, internally used
     get_path = function(path){
-      raveutils::find_path(file.path('inst', path), root_dir = self$package_root)
+      find_path(file.path('inst', path), root_dir = self$package_root)
     }
 
   ),
   active = list(
+    #' @field package_root package root directory, when running in debug
+    #' context, returns module debug path, otherwise returns system package path
     package_root = function(){
       if(debug){
         context = 'rave_module_debug'
       } else {
         context = 'rave_compile'
       }
-      raveutils::with_rave_context(
+      with_rave_context(
         context,
         {
-          raveutils::rave_module_root_directory()
+          rave_module_root_directory()
         },
         package = self$package, module_id = self$module_id
       )

@@ -109,7 +109,7 @@ rave_dash_page <- function(
         rel = "icon", type = "image/x-icon",
         href = dipsaus::to_datauri(system.file('assets/images/favicon.ico', package = 'ravecore')))),
       shiny::bootstrapPage(
-        raveutils::register_js(),
+        register_js(),
         shiny::div(
           id = '__rave__mask__',
           class = ifelse(is.null(initial_mask), 'hidden', ''),

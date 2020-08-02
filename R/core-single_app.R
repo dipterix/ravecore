@@ -1,14 +1,14 @@
-
+#' @rdname start-app
 #' @export
 view_layout <- function(host = '127.0.0.1', port = NULL, theme = 'red'){
 
-  ctx <- raveutils::rave_context()
+  ctx <- rave_context()
 
   ctx$module_id
 
   adapter <- dipsaus::fastmap2()
   adapter$test.mode = TRUE
-  adapter$context <- raveutils::rave_context()
+  adapter$context <- rave_context()
   adapter$active_session <- 0L
   adapter$module_list <- data.frame(
     stringsAsFactors = FALSE,

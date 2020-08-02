@@ -38,8 +38,8 @@
 
 
 #' @import dipsaus
+#' @import raveio
 #' @import ravecore
-#' @import raveutils
 #' @import shiny
 
 
@@ -53,29 +53,28 @@ dev_${{PACKAGE}} <- function(module_id, expose = TRUE, clear_env = FALSE){
   }
 
   if(clear_env){
-    raveutils::clear_env(.GlobalEnv)
+    dipsaus::clear_env(.GlobalEnv)
   }
-  if(raveutils::verify_rstudio_version() && requireNamespace('rstudioapi')){
-    pkg_dir <- rstudioapi::getActiveProject()
-  } else {
-    pkg_dir <- '.'
+  if(dipsaus::rs_avail()){
+    pkg_dir <- dipsaus::rs_active_project()
   }
-  raveutils::save_all()
+  pkg_dir %?<-% '.'
+  dipsaus::rs_save_all()
   devtools::document(pkg_dir)
   devtools::load_all(pkg_dir, reset = FALSE, export_all = TRUE)
 
   # set context
-  raveutils::rave_context(context = 'rave_module_debug', package = '${{PACKAGE}}', module_id = module_id)
+  ravecore::rave_context(context = 'rave_module_debug', package = '${{PACKAGE}}', module_id = module_id)
 
   re_env <- if (expose) .GlobalEnv else new.env(parent = .GlobalEnv)
   # get toolboxes
-  fs <- list.files(raveutils::package_file('inst/tools/'), full.names = TRUE)
+  fs <- list.files(ravecore::package_file('inst/tools/'), full.names = TRUE)
   for(f in fs){
     source(f, local = re_env)
   }
 
   session_data <- ravecore::getDefaultSessionData()
-  raveutils::clear_env(session_data)
+  dipsaus::clear_env(session_data)
 
   invisible(re_env)
 

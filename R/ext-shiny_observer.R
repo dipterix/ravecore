@@ -13,9 +13,9 @@ make_observe <- function(map, error_handler = NULL, on_invalidate = NULL){
             error_handler(e)
           } else {
             print(e$call)
-            raveutils::rave_debug("Event expression with error raised")
+            rave_debug("Event expression with error raised")
             cat(!!deparse(x), sep = '\n')
-            raveutils::rave_error("[Module ERROR] {e$message}")
+            rave_error("[Module ERROR] {e$message}")
           }
         })
       })
@@ -54,10 +54,10 @@ make_observeEvent <- function(map, error_handler = NULL, on_invalidate = NULL){
           if(is.function(error_handler)){
             error_handler(e)
           } else {
-            raveutils::rave_debug("Event expression with error raised")
+            rave_debug("Event expression with error raised")
             print(e$call)
             cat(!!deparse(eventExpr), sep = '\n')
-            raveutils::rave_error("[Module ERROR] {e$message}")
+            rave_error("[Module ERROR] {e$message}")
           }
         })
       })
@@ -70,10 +70,10 @@ make_observeEvent <- function(map, error_handler = NULL, on_invalidate = NULL){
           if(is.function(error_handler)){
             error_handler(e)
           } else {
-            raveutils::rave_debug("Event expression with error raised")
+            rave_debug("Event expression with error raised")
             print(e$call)
             cat(!!deparse(handlerExpr), sep = '\n')
-            raveutils::rave_error("[Module ERROR] {e$message}")
+            rave_error("[Module ERROR] {e$message}")
           }
         })
       })
@@ -113,6 +113,15 @@ remove_observers <- function(map){
 }
 
 
+#' Safe way to show shiny notifications
+#' @description Show notification when shiny is running, and show console
+#' messages when shiny is offline
+#' @param ... messages to display
+#' @param type message type, choices are "message", "warning", "error",
+#' "default"
+#' @param duration seconds for notification to stay
+#' @param closeBotton,action,id,session passed to
+#' \code{\link[shiny]{showNotification}}
 #' @export
 module_notification <- function(
   ..., type = c("message", "warning", "error", "default"),
@@ -120,10 +129,10 @@ module_notification <- function(
   session = shiny::getDefaultReactiveDomain()){
 
   type = match.arg(type)
-  context = raveutils::from_rave_context('context')
+  context = from_rave_context('context')
   if(context == 'rave_running'){
     if(missing(id)){
-      id = paste0('..rave-notification-', raveutils::from_rave_context('module_id'))
+      id = paste0('..rave-notification-', from_rave_context('module_id'))
     }
     shiny::showNotification(ui = shiny::p(...), action = action, duration = duration,
                             closeButton = closeBotton, id = id, type = type, session = session)
@@ -138,12 +147,14 @@ module_notification <- function(
   }
 }
 
+#' Safe way to remove shiny notification within module
+#' @param id,... passed to \code{\link[shiny]{removeNotification}}
 #' @export
 module_remove_notification <- function(id, ...){
-  context = raveutils::from_rave_context('context')
+  context = from_rave_context('context')
   if(context == 'rave_running'){
     if(missing(id)){
-      id = paste0('..rave-notification-', raveutils::from_rave_context('module_id'))
+      id = paste0('..rave-notification-', from_rave_context('module_id'))
     }
     shiny::removeNotification(id, ...)
   }

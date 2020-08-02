@@ -12,7 +12,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
 
   # ------------ Load dynamic scripts ------------
-  raveutils::rave_info('[{container$module_label}] Loading dynamic scripts...')
+  rave_info('[{container$module_label}] Loading dynamic scripts...')
 
   lapply(container$dynamic_script, function(s){
     tryCatch({
@@ -22,7 +22,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
         source(s, local = container$runtime_env)
       }
     }, error = function(e){
-      raveutils::rave_error('Error found in script: \n {s} \nReason: {e$message}')
+      rave_error('Error found in script: \n {s} \nReason: {e$message}')
       traceback(e)
     })
     invisible()
@@ -47,7 +47,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   # 1. new module
   # 2. new data loaded
   initialize_module <- function(){
-    raveutils::rave_debug('Initialize inputs')
+    rave_debug('Initialize inputs')
 
     local_map$initialize_error = FALSE
 
@@ -57,7 +57,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       tryCatch({
         dipsaus::eval_dirty(expr, env = container$mask_env)
       }, error = function(e){
-        raveutils::rave_error(e$message)
+        rave_error(e$message)
         print(expr)
         print(e$call)
         module_notification('Error while initializing module.')
@@ -73,7 +73,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       tryCatch({
         comp$hook()
       }, error = function(e){
-        raveutils::rave_error(e$message)
+        rave_error(e$message)
         print(e$call)
         module_notification('Error while updating input: ', comp$input_id)
         local_map$initialize_error = TRUE
@@ -92,7 +92,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
   # When data load succeeds
   shiny::observeEvent(container$container_reactives$..rave_data_loaded.., {
-    raveutils::rave_debug('Data loaded signal received')
+    rave_debug('Data loaded signal received')
     if(!isFALSE(container$has_data)){
       container$close_data_selector(session = session)
 
@@ -127,7 +127,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   })
 
   input_changed <- shiny::debounce(shiny::reactive({
-    raveutils::rave_debug('Detected input change')
+    rave_debug('Detected input change')
     local_reactives$input_changed
   }), 50)
 
@@ -136,7 +136,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   }), local_map$delay_input)
 
   container$wrapper_env$observeEvent(render_outputs(), {
-    raveutils::rave_info('Sending signals to update outputs')
+    rave_info('Sending signals to update outputs')
     dipsaus::set_shiny_input(session, inputId = '..rave_output_update_all..',
                              value = Sys.time(), priority = 'event')
   }, label = sprintf('rave-observer-%s-update_outputs', container$module_id))
@@ -152,12 +152,12 @@ shinirize <- function(input, output, session, container, app_data, adapter){
   # Returns true/false whether main.R is terminated (false) or not (true)
   execute_main <- function(){
     if(!isTRUE(local_map$last_loaded == app_data$last_loaded)){
-      raveutils::rave_info('Detect data change. Scheduled to re-run all blocks')
+      rave_info('Detect data change. Scheduled to re-run all blocks')
       local_map$last_loaded = app_data$last_loaded
       local_map$data_changed = TRUE
       all = TRUE
     } else {
-      raveutils::rave_info('No data change. Run smartly')
+      rave_info('No data change. Run smartly')
       if(isTRUE(local_map$data_changed)){
         all = TRUE
       } else {
@@ -169,21 +169,21 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       # tryCatch({
       #   stop(123)
       # }, error = function(e){
-      #   raveutils::rave_fatal('asdasd')
+      #   rave_fatal('asdasd')
       # })
       container$`@run`(all = all)
       container$auto_run <- container$auto_run - 1
       local_map$data_changed = FALSE
       TRUE
     }, raveExitMain = function(e){
-      raveutils::rave_debug('Module early terminated main.R.')
+      rave_debug('Module early terminated main.R.')
       FALSE
     }, error = function(e){
-      raveutils::rave_debug('Module run into error.')
-      raveutils::rave_error(e$message)
+      rave_debug('Module run into error.')
+      rave_error(e$message)
       FALSE
     }, raveFatal = function(e){
-      raveutils::rave_debug('Module run into error. Debug information is highlighted above.')
+      rave_debug('Module run into error. Debug information is highlighted above.')
       FALSE
     })
   }
@@ -191,14 +191,14 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
   container$wrapper_env$observeEvent(input_changed(), {
     if(!container$has_data){
-      raveutils::rave_info('[{container$module_label}] Waiting to load data')
+      rave_info('[{container$module_label}] Waiting to load data')
       return()
     }
     if(!local_reactives$initialized){
-      raveutils::rave_info('[{container$module_label}] Waiting for instialization')
+      rave_info('[{container$module_label}] Waiting for instialization')
       return()
     }
-    raveutils::rave_debug('Module has data [{container$has_data}] and initialized [{local_reactives$initialized}]')
+    rave_debug('Module has data [{container$has_data}] and initialized [{local_reactives$initialized}]')
     # Run main!!! finally
 
     calibrate_inputs()
@@ -210,7 +210,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       # will require run main.R
       succeed <- TRUE
       if(container$auto_run <= 0){
-        raveutils::rave_debug("auto-run is off, only render outputs")
+        rave_debug("auto-run is off, only render outputs")
       } else {
         # shiny::isolate(execute_main())
         succeed <- execute_main()
@@ -221,7 +221,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
         local_reactives$render_output = Sys.time()
       }
     } else if (update_levels == 1){
-      raveutils::rave_debug("[{container$module_label}] No input that affects main.R detected, re-render outputs")
+      rave_debug("[{container$module_label}] No input that affects main.R detected, re-render outputs")
       # only render
       local_reactives$render_output = Sys.time()
     }
@@ -259,7 +259,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
       #                          value = Sys.time(), priority = 'event')
       container$container_reactives$..rave_import_data_ui_show.. <- Sys.time()
     } else if(close_if_pass){
-      raveutils::rave_debug('Automatically hide selector')
+      rave_debug('Automatically hide selector')
       container$close_data_selector(session = session)
       # dipsaus::set_shiny_input(session = session, inputId = '..rave_data_loaded..',
       #                          value = Sys.time(), priority = 'event')
@@ -277,7 +277,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
 
   container$`@shiny_resume` <- function(close_if_pass = TRUE){
 
-    raveutils::rave_info('Resuming module')
+    rave_info('Resuming module')
 
     check_data(close_if_pass = close_if_pass)
 
@@ -308,7 +308,7 @@ shinirize <- function(input, output, session, container, app_data, adapter){
     base::print(local_reactives$initialized)
     base::print(container$container_reactives$..rave_import_data_ui_show..)
 
-    raveutils::rave_info('Rendering data panel')
+    rave_info('Rendering data panel')
     modal_info <- container$`@display_loader`()
     est_loadtime <- modal_info$expectedloadingtime
     if(length(est_loadtime) == 1){

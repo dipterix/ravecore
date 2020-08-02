@@ -1,3 +1,17 @@
+#' Create 3D brain instance
+#' @seealso \code{\link[threeBrain]{freesurfer_brain2}}
+#' @param subject character or \code{RAVESubject} instance
+#' @param surfaces surface types, usually stored as \code{'*h.xxx'} in
+#' 'FreeSurfer' folder or 'SUMA' folder
+#' @param use_141 whether to use 'SUMA' standard 141 brain if exists
+#' @param recache,clean_before_cache whether to re-calculate cache and
+#' clean cache before redo cache
+#' @param compute_template whether to compute for template brain, usually
+#' use it when 141 brain is used
+#' @param usetemplateifmissing if surface data is missing, should
+#' template brain be used? this requires 'MNI305' coordinates
+#' @return A \code{rave-brain} instance, see more at 3D viewer function
+#' \code{\link[threeBrain]{freesurfer_brain2}}
 #' @export
 rave_brain2 <- function(subject, surfaces = 'pial', use_141 = TRUE,
          recache = FALSE, clean_before_cache = FALSE,

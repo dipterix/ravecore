@@ -23,20 +23,20 @@ save_meta <- function(data, meta_type, project_name, subject_code){
       data$Label = ''
     }
 
-    raveutils::safe_write_csv(data, file = file.path(meta_dir, 'electrodes.csv'), row.names = FALSE)
+    safe_write_csv(data, file = file.path(meta_dir, 'electrodes.csv'), row.names = FALSE)
   }else if(meta_type == 'time_points'){
     names(data) = c('Block', 'Time')
-    raveutils::safe_write_csv(data, file = file.path(meta_dir, 'time_points.csv'), row.names = FALSE)
+    safe_write_csv(data, file = file.path(meta_dir, 'time_points.csv'), row.names = FALSE)
   }else if(meta_type == 'frequencies'){
     names(data) = c('Frequency')
-    raveutils::safe_write_csv(data, file = file.path(meta_dir, 'frequencies.csv'), row.names = FALSE)
+    safe_write_csv(data, file = file.path(meta_dir, 'frequencies.csv'), row.names = FALSE)
   }else if(meta_type == 'time_excluded'){
     if(!is.data.frame(data)){
       data = as.data.frame(data, stringsAsFactors = FALSE)
     }
     if(nrow(data)){
       names(data) = c('Block', 'Start', 'End')
-      raveutils::safe_write_csv(data, file = file.path(meta_dir, 'time_excluded.csv'), row.names = FALSE)
+      safe_write_csv(data, file = file.path(meta_dir, 'time_excluded.csv'), row.names = FALSE)
     }
   }
 
@@ -122,7 +122,7 @@ load_meta <- function(meta_type, project_name, subject_code, subject_id, meta_na
       # check blocks
       preprocess_yaml = file.path(meta_dir, '..', 'preprocess', 'rave.yaml')
       if(file.exists(preprocess_yaml)){
-        preproc_info = raveutils::load_yaml(preprocess_yaml)
+        preproc_info = load_yaml(preprocess_yaml)
         if(length(preproc_info$blocks)){
           pass_test = TRUE
           # let's check block!
@@ -166,7 +166,7 @@ load_meta <- function(meta_type, project_name, subject_code, subject_id, meta_na
     }
     else if(meta_type == 'info'){
       info_file = file.path(meta_dir, 'info.yaml')
-      info = raveutils::load_yaml(info_file)
+      info = load_yaml(info_file)
       return(as.list(info))
     }
     else if(meta_type == 'time_excluded'){

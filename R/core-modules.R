@@ -13,13 +13,13 @@ module_exists <- function(package, module_id){
     return(FALSE)
   }
 
-  conf <- raveutils::load_yaml(conf)
+  conf <- load_yaml(conf)
   # package version is too low
   ver <- conf$rave_version
   ver %?<-% '0.0.0'
   if(compare_rave_version(ver, strict = TRUE)){
     # TODO: Add more detailed instructions
-    raveutils::rave_warn('Package ', package, ' requires at least version', ver, '. Your rave core version might be too low. Please update RAVE.')
+    rave_warn('Package ', package, ' requires at least version', ver, '. Your rave core version might be too low. Please update RAVE.')
     return(FALSE)
   }
 
@@ -33,13 +33,13 @@ module_exists <- function(package, module_id){
   comp_path <- file.path(module_path, module_id, 'comp.R')
 
   if(!file.exists(comp_path)){
-    raveutils::rave_warn('Cannot find comp.R in module path - ', module_id)
+    rave_warn('Cannot find comp.R in module path - ', module_id)
     return(FALSE)
   }
 
   main_path <- file.path(module_path, module_id, 'main.R')
   if(!file.exists(main_path)){
-    raveutils::rave_warn('Cannot find main.R in module path - ', module_id)
+    rave_warn('Cannot find main.R in module path - ', module_id)
     return(FALSE)
   }
 
@@ -76,7 +76,7 @@ find_modules <- function(packages){
   packages <- unique(packages)
   modules <- dipsaus::fastmap2()
   lapply(packages, function(pkg){
-    conf <- raveutils::load_yaml(system.file('rave2.yaml', package = pkg))
+    conf <- load_yaml(system.file('rave2.yaml', package = pkg))
     for(minfo in conf$modules){
       minfo$package = pkg
       minfo$notes = ''
@@ -121,7 +121,7 @@ find_modules <- function(packages){
         }
       }
     }, error = function(e){
-      raveutils::rave_warn('An error found while reading file {module_csv}. ',
+      rave_warn('An error found while reading file {module_csv}. ',
                            'The customized settings are ignored.')
     })
 
@@ -170,7 +170,7 @@ app_ui <- function(adapter, theme = 'purple', token = NULL){
     if (isTRUE(url_info$type == "3dviewer")) {
       return(get_ui('rave-3d-viewer', '3D viewer not ready', url_info$globalId, url_info$sessionId))
     }
-    nomodal <- raveutils::get_val2(url_info, 'nomodal', default = FALSE, min_len = 1, max_len = 1)
+    nomodal <- get_val2(url_info, 'nomodal', default = FALSE, min_len = 1, max_len = 1)
 
     if(!isTRUE(url_info$theme %in% c("purple", "red", "green", "blue", "white"))){
       url_info$theme = !!theme
@@ -198,7 +198,7 @@ app_ui_env[['rave-main-app']] <- function(adapter, theme = 'purple', ...){
 
     sub_items <- lapply(seq_len(nrow(rows)), function(ii){
       row <- as.list(rows[ii, ])
-      if(raveutils::is_valid_ish(row$icon, max_len = 1,
+      if(is_valid_ish(row$icon, max_len = 1,
                                  mode = 'character', na = TRUE,
                                  blank = TRUE)){
         row$icon <- shiny::icon(row$icon)
@@ -224,7 +224,7 @@ app_ui_env[['rave-main-app']] <- function(adapter, theme = 'purple', ...){
   if(nrow(rows)){
     misc_items <- lapply(seq_len(nrow(rows)), function(ii){
       row <- as.list(rows[ii, ])
-      if(raveutils::is_valid_ish(row$icon, max_len = 1,
+      if(is_valid_ish(row$icon, max_len = 1,
                                  mode = 'character', na = TRUE,
                                  blank = TRUE)){
         row$icon <- shiny::icon(row$icon)
@@ -278,7 +278,7 @@ app_ui_env[['rave-main-app']] <- function(adapter, theme = 'purple', ...){
 
 app_server_main <- function(input, output, session, adapter){
 
-  rave_id <- raveutils::add_to_session(session, 'rave_id')
+  rave_id <- add_to_session(session, 'rave_id')
   adapter$module_list %?<-% find_modules()
 
   test_mode <- isTRUE(adapter$test.mode)
@@ -297,10 +297,10 @@ app_server_main <- function(input, output, session, adapter){
     observeEvent = shiny::observeEvent
   } else {
     observe = make_observe(internal_observers, error_handler = function(e){
-      raveutils::rave_error("[Module ERROR] {e$message}")
+      rave_error("[Module ERROR] {e$message}")
     })
     observeEvent = make_observeEvent(internal_observers, error_handler = function(e){
-      raveutils::rave_error("[Module ERROR] {e$message}")
+      rave_error("[Module ERROR] {e$message}")
     })
   }
 
@@ -355,7 +355,7 @@ app_server_main <- function(input, output, session, adapter){
         return(containers[[module_id]])
 
       }, error = function(e){
-        raveutils::rave_error('Cannot parse module {module_id} for the following reasons:')
+        rave_error('Cannot parse module {module_id} for the following reasons:')
         cat(e$message, '\n')
         traceback(e)
       })
@@ -372,10 +372,10 @@ app_server_main <- function(input, output, session, adapter){
 
     # assign('aaa', container, envir = globalenv())
     # assign('session', session, envir = globalenv())
-    raveutils::add_to_session(session, key = 'rave_instance', val = container, override = TRUE)
+    add_to_session(session, key = 'rave_instance', val = container, override = TRUE)
     container$register_context('rave_running')
 
-    raveutils::rave_info('Switched to module - {container$module_label}')
+    rave_info('Switched to module - {container$module_label}')
 
     if(!isTRUE(app_data$last_module_id == container$module_id)){
 
@@ -399,18 +399,18 @@ app_server_main <- function(input, output, session, adapter){
     # remove from ravecore:::rave_loaded_modules$module_id
     .subset2(container$module$containers, 'remove')(rave_id)
 
-    raveutils::clear_env(container$user_observers)
-    raveutils::clear_env(container$runtime_env)
-    raveutils::clear_env(container$mask_env)
-    raveutils::clear_env(container$static_env)
-    raveutils::clear_env(container$wrapper_env)
-    raveutils::clear_env(container$container_data)
+    clear_env(container$user_observers)
+    clear_env(container$runtime_env)
+    clear_env(container$mask_env)
+    clear_env(container$static_env)
+    clear_env(container$wrapper_env)
+    clear_env(container$container_data)
 
     rm(container)
   }
 
   current_container <- function(){
-    module_id <- raveutils::from_rave_context('module_id')
+    module_id <- from_rave_context('module_id')
     if(length(module_id)){
       return(get_container(module_id))
     }
@@ -459,11 +459,11 @@ app_server_main <- function(input, output, session, adapter){
       if(container$data_selector_opened){
         container$`@safe_close_selector`()
       } else {
-        raveutils::rave_debug('Open up data selector')
+        rave_debug('Open up data selector')
         container$`@shiny_resume`(close_if_pass = FALSE)
       }
     } else {
-      raveutils::rave_debug('Cannot find container to open up data selector')
+      rave_debug('Cannot find container to open up data selector')
     }
   })
 
@@ -473,13 +473,13 @@ app_server_main <- function(input, output, session, adapter){
     if(isTRUE(adapter$test.mode)){
       adapter$active_session = adapter$active_session - 1L
       if(adapter$active_session == 0){
-        raveutils::rave_info('No active shiny session - Reset context')
+        rave_info('No active shiny session - Reset context')
         # set context
         ctx <- adapter$context
         if(isTRUE(ctx$context == 'rave_module_debug')){
-          raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
+          rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
         } else {
-          raveutils::rave_context('default', .force = TRUE)
+          rave_context('default', .force = TRUE)
         }
         rm(ctx)
       }
@@ -487,7 +487,7 @@ app_server_main <- function(input, output, session, adapter){
       return()
     }
 
-    raveutils::rave_debug('Session ended')
+    rave_debug('Session ended')
     # clear containers
     for(nm in names(containers)){
       remove_container(nm)
@@ -495,30 +495,64 @@ app_server_main <- function(input, output, session, adapter){
 
     adapter$active_session = adapter$active_session - 1L
     if(adapter$active_session == 0){
-      raveutils::rave_info('No active shiny session - Reset context')
+      rave_info('No active shiny session - Reset context')
       # set context
       ctx <- adapter$context
       if(isTRUE(ctx$context == 'rave_module_debug')){
-        raveutils::rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
+        rave_context('rave_module_debug', ctx$package, ctx$module_id, .force = TRUE)
       } else {
-        raveutils::rave_context('default', .force = TRUE)
+        rave_context('default', .force = TRUE)
       }
       rm(ctx)
     }
 
-    raveutils::clear_env(session$userData)
+    clear_env(session$userData)
 
   })
 
 }
 
+#' Start 'RAVE' Applications
+#' @description Use \code{start_rave} to launch applications; use
+#' \code{view_layout} to debug module.
+#' @param host IP address, default is \code{'127.0.0.1'}
+#' @param port integer port to listen to, default is \code{NULL}, and will be
+#' assigned a random port
+#' @param launch_browser whether to launch browser once the application is
+#' opened
+#' @param test_mode whether to enter test mode. Test mode does not release
+#' memory once application is closed, this will allow step-by-step debugging
+#' @param token token needed to launch application, default does not require
+#' any token
+#' @param theme passed to \code{\link[shinydashboard]{dashboardPage}}
+#' @param .adapter debug use, must be a \code{\link[dipsaus]{fastmap2}}
+#' instance. Combined with \code{test_mode=TRUE}, \code{.adapter} stores
+#' all container/module instances.
+#'
+#' @examples
+#'
+#' if(interactive()){
+#'
+#'   # Production
+#'   start_rave()
+#'
+#'   # Debug rave preprocess
+#'   rave_context('rave_module_debug', package = 'ravetools',
+#'                module_id = 'ravepreprocessoverview')
+#'   view_layout()
+#' }
+#'
+#' @name start-app
+NULL
+
+#' @rdname start-app
 #' @export
 start_rave <- function(host = '127.0.0.1', port = NULL, launch_browser=TRUE,
                        test_mode = FALSE, token = NULL, theme = 'purple',
                        .adapter = dipsaus::fastmap2()){
   adapter <- .adapter
   adapter$test.mode = isTRUE(test_mode)
-  adapter$context <- raveutils::rave_context()
+  adapter$context <- rave_context()
   adapter$active_session <- 0L
 
   ui <- app_ui(adapter = adapter, theme = theme, token = token)
@@ -534,4 +568,6 @@ start_rave <- function(host = '127.0.0.1', port = NULL, launch_browser=TRUE,
 
   print(app)
 }
+
+
 

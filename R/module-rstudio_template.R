@@ -6,16 +6,16 @@ create_template <- function(path, ...){
   # step 1: get package name
   # path = normalizePath(path)
 
-  raveutils::rave_info('Creating RAVE Module - {path}')
+  rave_info('Creating RAVE Module - {path}')
 
   PACKAGE = utils::tail(strsplit(path, '\\\\|/')[[1]],1)
   MODULEID = args[['module_id']]
 
   # ensure path exists
-  raveutils::dir_create(path)
-  raveutils::dir_create(file.path(path, 'inst', 'tools'))
-  raveutils::dir_create(file.path(path, 'inst', 'modules', MODULEID))
-  raveutils::dir_create(file.path(path, 'R'))
+  dir_create(path)
+  dir_create(file.path(path, 'inst', 'tools'))
+  dir_create(file.path(path, 'inst', 'modules', MODULEID))
+  dir_create(file.path(path, 'R'))
 
 
   # check MODULEID, must starts with 'a-zA-z' and only contains 'a-zA-Z0-9_'
@@ -24,14 +24,14 @@ create_template <- function(path, ...){
   if(MODULEID == ''){
     MODULEID = 'module_id'
   }
-  raveutils::rave_info('Module ID - {MODULEID}')
+  rave_info('Module ID - {MODULEID}')
 
   MODULELABEL = args[['module_label']]
   MODULELABEL = gsub('(^[\\ ]*)|([\\ ]$)', '', MODULELABEL)
   if(MODULELABEL == ''){
     MODULELABEL = 'Missing Label'
   }
-  raveutils::rave_info('Display Label - {MODULELABEL}')
+  rave_info('Display Label - {MODULELABEL}')
 
   # migrate template
   template_dir = system.file('rstudio/templates/project', package = 'ravecore')
@@ -51,7 +51,7 @@ create_template <- function(path, ...){
   for(f in fs){
     s = readLines(file.path(template_dir, f))
     s = paste(s, collapse = '\n')
-    s = raveutils::rave_glue(s, .open = "${{", .close = "}}")
+    s = glue(s, .open = "${{", .close = "}}")
     f = stringr::str_replace(f, 'first_example', MODULEID)
     writeLines(s, con = file.path(path, f))
   }
@@ -68,4 +68,10 @@ create_template <- function(path, ...){
 
 
 
-# rstudioapi::createProjectTemplate(binding = 'create_template', package = '.', title = 'RAVE Module', open_files = c('R/inputs.R', 'R/outputs.R'), )
+# rstudioapi::createProjectTemplate(
+#   binding = 'create_template',
+#   package = '.',
+#   title = 'RAVE Module',
+#   open_files = c('R/inputs.R', 'R/outputs.R'),
+#
+# )

@@ -2,15 +2,20 @@
 
 .RAVEGlobalEnv <- new.env(parent = emptyenv())
 
+#' Get default data repository
+#' @description Default data repository is an environment shared by modules
+#' and packages to store/fetch small global items. Not used often, but useful
+#' when 'RAVE' modules need communication across packages.
+#' @return environment
 #' @export
 getDefaultDataRepository <- function(){
   .RAVEGlobalEnv
 }
 
-getDefaultContainer <- raveutils::rave_context_generics('getDefaultContainer')
+getDefaultContainer <- rave_context_generics('getDefaultContainer')
 
 getDefaultContainer.rave_running <- function(){
-  raveutils::from_rave_context('instance')$container_reactives
+  from_rave_context('instance')$container_reactives
 }
 
 getDefaultContainer.rave_running_local <- function(){
@@ -23,13 +28,16 @@ getDefaultContainer.rave_module_debug <- function(){
   list()
 }
 
-
+#' Get shiny \code{input} object
+#' @description Get \code{session$input} object with correct scope
+#' @param isolated whether to \code{\link[shiny]{isolate}} input as a list
+#' @param ... pass to other methods
 #' @export
-getDefaultReactiveInput <- raveutils::rave_context_generics('getDefaultReactiveInput', alist(isolated = FALSE, ...=))
+getDefaultReactiveInput <- rave_context_generics('getDefaultReactiveInput', alist(isolated = FALSE, ...=))
 
 #' @export
 getDefaultReactiveInput.rave_running <- function(isolated = FALSE, ..., session = shiny::getDefaultReactiveDomain()){
-  module_id = raveutils::from_rave_context('module_id')
+  module_id = from_rave_context('module_id')
   if(module_id != session$ns(NULL)){
     session = session$rootScope()$makeScope(module_id)
   }
@@ -47,7 +55,7 @@ getDefaultReactiveInput.rave_running_local <- function(isolated = FALSE, ...){
 
 #' @export
 getDefaultReactiveInput.rave_module_debug <- function(isolated = FALSE, ...){
-  module_id = raveutils::from_rave_context('module_id')
+  module_id = from_rave_context('module_id')
   module = loaded_rave_module(module_id)
   new = TRUE
   if(!is.null(module)){
@@ -78,13 +86,15 @@ getDefaultReactiveInput.rave_module_debug <- function(isolated = FALSE, ...){
   re
 }
 
-
+#' Get shiny \code{output} object
+#' @description Get \code{session$output} object with correct scope
+#' @param ... pass to other methods
 #' @export
-getDefaultReactiveOutput <- raveutils::rave_context_generics('getDefaultReactiveOutput', alist(...=))
+getDefaultReactiveOutput <- rave_context_generics('getDefaultReactiveOutput', alist(...=))
 
 #' @export
 getDefaultReactiveOutput.rave_running <- function(..., session = shiny::getDefaultReactiveDomain()){
-  module_id = raveutils::from_rave_context('module_id')
+  module_id = from_rave_context('module_id')
   if(module_id != session$ns(NULL)){
     session = session$rootScope()$makeScope(module_id)
   }
@@ -94,7 +104,7 @@ getDefaultReactiveOutput.rave_running <- function(..., session = shiny::getDefau
 #' @export
 getDefaultReactiveOutput.rave_running_local <- function(...){
   # get context instance
-  instance <- raveutils::from_rave_context('instance')
+  instance <- from_rave_context('instance')
   instance$local_output %?<-% dipsaus::fastmap2()
   instance$local_output
 }
@@ -106,13 +116,18 @@ getDefaultReactiveOutput.rave_module_debug <- function(isolated = FALSE, ...){
 }
 
 
-
+#' Get a list shared across modules within a same package
+#' @description Package data is a \code{\link[dipsaus]{fastmap2}} instance that
+#' stores key-value pairs. A package data is shared across modules but
+#' independent across 'RAVE' packages. It's useful to store shared data
+#' for modules
+#' @return A \code{\link[dipsaus]{fastmap2}} instance
 #' @export
-getDefaultPackageData <- raveutils::rave_context_generics('getDefaultPackageData')
+getDefaultPackageData <- rave_context_generics('getDefaultPackageData')
 
 
 ..getDefaultPackageData <- function(){
-  raveutils::from_rave_context('instance')$module$package_data
+  from_rave_context('instance')$module$package_data
 }
 
 #' @export
@@ -121,8 +136,8 @@ getDefaultPackageData.rave_running <- ..getDefaultPackageData
 getDefaultPackageData.rave_running_local <- ..getDefaultPackageData
 #' @export
 getDefaultPackageData.rave_module_debug <- function(){
-  module_id <- raveutils::from_rave_context('module_id')
-  package <- raveutils::from_rave_context('package')
+  module_id <- from_rave_context('module_id')
+  package <- from_rave_context('package')
   module <- loaded_rave_module(module_id, package)
   if(!inherits(module, 'RAVEModule')){
     module = RAVEModule$new(package = package, module_id = module_id, force = FALSE)
@@ -130,13 +145,18 @@ getDefaultPackageData.rave_module_debug <- function(){
   module$package_data
 }
 
-
+#' Get a list specific for currect shiny session and 'RAVE' module
+#' @description Session data is a \code{\link[dipsaus]{fastmap2}} instance that
+#' stores key-value pairs. Session data are independent across modules and
+#' shiny sessions. Two modules have different session data, and for same
+#' module, two shiny sessions also have different session data.
+#' @return A \code{\link[dipsaus]{fastmap2}} instance
 #' @export
-getDefaultSessionData <- raveutils::rave_context_generics('getDefaultSessionData')
+getDefaultSessionData <- rave_context_generics('getDefaultSessionData')
 
 
 ..getDefaultSessionData <- function(){
-  raveutils::from_rave_context('instance')$container_data
+  from_rave_context('instance')$container_data
 }
 
 #' @export
@@ -156,7 +176,9 @@ getDefaultSessionData.rave_compile <- function(){
 }
 
 
-
+#' Create a fake 'RAVE-shiny' session
+#' @param rave_id internally used
+#' @param id 'RAVE' module ID
 #' @export
 fake_session <- function(rave_id = '__fake_session__', id = NULL){
   self_id = id

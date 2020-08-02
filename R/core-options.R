@@ -49,17 +49,17 @@ rave_options_initialize <- function(){
 
 
   if(file.exists(RAVE_YAML_FILE)){
-    raveutils::load_yaml(RAVE_YAML_FILE, map = rave_options_object)
+    load_yaml(RAVE_YAML_FILE, map = rave_options_object)
   }
 }
 
 rave_options_save <- function(){
   if(!dir.exists('~')){
-    raveutils::rave_warn("Cannot find user's HOME directory ~/  Do you have home directory?")
+    rave_warn("Cannot find user's HOME directory ~/  Do you have home directory?")
     return(invisible())
   }
   # save to RAVE_YAML_FILE
-  raveutils::save_yaml(rave_options_object, RAVE_YAML_FILE)
+  save_yaml(rave_options_object, RAVE_YAML_FILE)
 }
 
 rave_options_tolist <- function(){
@@ -101,7 +101,7 @@ rave_options <- function(..., .save = TRUE, launch_gui = TRUE,
   # else it's time to get options
 
   # In shiny mode or launch_gui is set to FALSE, just return the options
-  if(!isTRUE(launch_gui) || raveutils::shiny_is_running()){
+  if(!isTRUE(launch_gui) || shiny_is_running()){
     return(rave_options_tolist())
   }
 
@@ -114,12 +114,12 @@ rave_options <- function(..., .save = TRUE, launch_gui = TRUE,
 
 #' @export
 set_rave_theme <- function(...){
-  raveutils::rave_warn('set_rave_theme not implemented yet')
+  rave_warn('set_rave_theme not implemented yet')
 }
 
 #' @export
 get_rave_theme <- function(...){
-  raveutils::rave_warn('get_rave_theme not implemented yet')
+  rave_warn('get_rave_theme not implemented yet')
 }
 
 

@@ -5,7 +5,7 @@ self = parse_module(package, module_id)
 
 launch_single_module <- function(package, module_id){
 
-  raveutils::rave_condition('default')
+  ravecore::rave_condition('default')
   self = parse_module(package, module_id)
   module_label = self$module$module_label
 
@@ -68,7 +68,7 @@ launch_single_module <- function(package, module_id){
 
     # Need to create module with session present
     # self = parse_module(package, module_id)
-    raveutils::add_to_session(session, key = 'rave_instance', val = self, override = TRUE)
+    dipsaus::add_to_session(session, key = 'rave_instance', val = self, override = TRUE)
     self$register_context('rave_running')
 
     self$`@register_shinysession`(session)
@@ -87,7 +87,7 @@ launch_single_module <- function(package, module_id){
           source(s, local = self$runtime_env)
         }
       }, error = function(e){
-        raveutils::rave_error('Error found in script: \n {s} \nReason: {e$message}')
+        ravecore::rave_error('Error found in script: \n {s} \nReason: {e$message}')
         traceback(e)
       })
       invisible()

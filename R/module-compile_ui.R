@@ -1,11 +1,80 @@
+#' Define 'RAVE' module inputs
+#' @description Used in 'RAVE' module file \code{'comp.R'} to define
+#' input components
+#' @param definition R expression; see example or details
+#' @param init_args arguments to change when data is loaded
+#' @param init_expr expression to calculate argument values
+#' @param keyword argument refering to shiny input ID, default is
+#' \code{"inputId"}
+#' @param update_level update level: 1, 2, or 0; see details.
+#' @param ... passed to other methods
+#' @details \code{definition} is un-evaluated R expression defining shiny inputs
+#' for example \code{textInput('text_id', 'Input:')}. All inputs in the
+#' following packages are supported: 'shiny' , 'dipsaus', 'ravecore',
+#' 'raveio'
+#'
+#' Because when defining inputs, there is no assumption on data content, all
+#' inputs values/choices should not be hard-coded. For example, before
+#' any subject is loaded, condition types are unknown, hence an input selecting
+#' condition types will need 'choices' to be reloaded once subject is loaded.
+#' \code{init_args} specify which arguments need to be changed once data
+#' is loaded. \code{init_expr} will be evaluated after initialization code
+#' and variables created during this procedure will be used to update input
+#' arguments.
+#'
+#' \code{update_level} has three levels: 1 is render only, updating input
+#' only results in outputs to be re-rendered; 2 is run all, not only outputs
+#' will be re-rendered, main function will be executed; 0 is manual input,
+#' meaning the input will remain as ordinary shiny input and one has to
+#' use shiny observer to capture value changes
+#'
+#' @examples
+#'
+#' \dontrun{
+#'
+#' # This code is ran in rave_validate
+#' repo <- loaded_rave_repository(
+#'   'demo/DemoSubject' ,
+#'   reference = 'default',
+#'   epoch = 'auditory_onset',
+#'   before_onset = 1,
+#'   after_onset = 2
+#' )
+#'
+#' define_input(
+#'
+#'   # No condition is known before data/subject is chosen
+#'   # repo is not available at this time
+#'   definition = shiny::selectInput(inputId = 'cond', label = 'Condition',
+#'                                   choices = character(0), selected = NULL),
+#'
+#'   # two arguments will be changed once subject is loaded
+#'   init_args = c('choices', 'selected'),
+#'
+#'   init_expr = {
+#'     # at this moment, you know some information about subject
+#'     # for example, repo is created and is available
+#'     choices <- unique(repo$epoch$table$Condition)
+#'     # So does selected
+#'     selected <- raveio::get_val2(repo, 'cond', choices[[1]])
+#'   }
+#'
+#' )
+#' }
+#'
+#' @name define_input
+NULL
+
+#' @rdname define_input
 #' @export
-define_input <- raveutils::rave_context_generics(
+define_input <- rave_context_generics(
   fun_name = 'define_input', alist(
     definition=, init_args=, init_expr=, keyword = "inputId",
     update_level=2, ...=
   ))
 
 
+#' @rdname define_input
 #' @export
 UPDATE_LEVEL <- list(
   render_only = 1L,
@@ -17,7 +86,7 @@ UPDATE_LEVEL <- list(
 define_input.rave_compile <- function(definition, init_args, init_expr, keyword = "inputId",
                                       update_level = 2, update_fun, recursive_ns = FALSE, ...) {
 
-  ctx = raveutils::rave_context()
+  ctx = rave_context()
   definition = substitute(definition)
 
   module_id = ctx$module_id
@@ -40,7 +109,7 @@ define_input.rave_compile <- function(definition, init_args, init_expr, keyword 
     update_fun = substitute(update_fun)
     if(missing(update_fun)){
       # guess the update function
-      update_fun <- str2lang(raveutils::guess_shiny_update(call, parse = FALSE))
+      update_fun <- str2lang(guess_shiny_update(call, parse = FALSE))
     }
 
     update_hook <- dipsaus::new_function2(body = {
@@ -102,7 +171,7 @@ define_input.rave_compile <- function(definition, init_args, init_expr, keyword 
 #' @export
 define_input.rave_module_debug <- function(definition, init_args, init_expr, keyword = "inputId",
                                            update_level = 2, update_fun, ...){
-  ctx = raveutils::rave_context()
+  ctx = rave_context()
   definition = substitute(definition)
   eval(definition, envir = new.env(parent = parent.frame()))
 
@@ -117,7 +186,7 @@ define_input.rave_module_debug <- function(definition, init_args, init_expr, key
       ns(arg)
     }), names = keyword))
 
-  raveutils::rave_info('Modified expression: ')
+  rave_info('Modified expression: ')
   print(call)
 
 
@@ -130,21 +199,30 @@ define_input.rave_module_debug <- function(definition, init_args, init_expr, key
       env <- new.env(parent = .GlobalEnv)
       eval(init_expr , envir = env)
       .GlobalEnv[[input_id]] = env[[val_name]]
-      raveutils::rave_debug('[DEBUG]: Assigned {input_id} as {deparse1(env[[val_name]])}')
+      rave_debug('[DEBUG]: Assigned {input_id} as {deparse1(env[[val_name]])}')
     }
   } else {
     val_name = val_name[val_name %in% names(call)]
     if(length(val_name)){
       .GlobalEnv[[input_id]] = eval(call[[val_name]], envir = parent.frame())
-      raveutils::rave_debug('[DEBUG]: Assigned {input_id} as {deparse1(.GlobalEnv[[input_id]])}')
+      rave_debug('[DEBUG]: Assigned {input_id} as {deparse1(.GlobalEnv[[input_id]])}')
     }
   }
 
   invisible()
 }
 
+#' Define 'RAVE' module outputs
+#' @param definition un-evaluated R expressions
+#' @param title title of output
+#' @param width integer from 1 to 12, width of output
+#' @param order order of the output; output with smaller order will be at the
+#' front row
+#' @param keyword argument name for shiny output ID
+#' @param watch_reactive reactive value to set once input is changed
+#' @param ... passed to other methods
 #' @export
-define_output <- raveutils::rave_context_generics(
+define_output <- rave_context_generics(
   fun_name = 'define_output', alist(
     definition=, title = '', width = 12L, order = Inf,
     keyword = 'outputId', watch_reactive = 'input$..rave_output_update_all..', ...=
@@ -155,7 +233,7 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
                                        keyword = 'outputId',
                                        watch_reactive = 'input$..rave_output_update_all..',
                                        render_fun, ...){
-  ctx = raveutils::rave_context()
+  ctx = rave_context()
   definition = substitute(definition)
 
   module_id = ctx$module_id
@@ -182,7 +260,7 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
   render_fun = substitute(render_fun)
   if(missing(render_fun)){
     # guess the update function
-    render_fun <- str2lang(raveutils::guess_shiny_output(call, parse = FALSE))
+    render_fun <- str2lang(guess_shiny_output(call, parse = FALSE))
   }
   watch_reactive <- c(list(quote(`{`)), lapply(watch_reactive, str2lang))
   watch_reactive <- as.call(watch_reactive)
@@ -201,9 +279,9 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
         f <- get0(!!output_id)
         if(is.function(f)){
 
-          raveutils::rave_debug(!!sprintf('Rendering - %s', output_id))
+          rave_debug(!!sprintf('Rendering - %s', output_id))
 
-          if(raveutils::test_farg(f, c('results'), dots = FALSE)){
+          if(test_farg(f, c('results'), dots = FALSE)){
             # combatible mode
             results = list(get_value = function(key, ifnotfound = NULL){
               get0(key, ifnotfound = ifnotfound)
@@ -211,7 +289,7 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
             f(results)
           } else{
             .ns <- asNamespace('ravecore')
-            args = c(TRUE, raveutils::test_farg(f, c('session_data', 'package_data', 'global_data')))
+            args = c(TRUE, test_farg(f, c('session_data', 'package_data', 'global_data')))
             args = list(quote(f),
                         session_data = quote(.ns$getDefaultSessionData()),
                         package_data = quote(.ns$getDefaultPackageData()),
@@ -221,7 +299,7 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
 
 
         } else{
-          stop(raveutils::rave_condition(
+          stop(rave_condition(
             !!sprintf('Function %s not found', sQuote(output_id)),
             class = c('shiny.silent.error', 'validation', 'simpleError', 'error', 'comdition')))
         }
@@ -245,7 +323,7 @@ define_output.rave_compile <- function(definition, title = '', width = 12L, orde
 define_output.rave_module_debug <- function(definition, title = '', width = 12L, order = Inf,
                                             keyword = 'outputId',
                                             watch_reactive = 'input$..rave_output_update_all..', ...){
-  ctx = raveutils::rave_context()
+  ctx = rave_context()
   definition = substitute(definition)
 
   module_id = ctx$module_id
@@ -270,14 +348,14 @@ define_output.rave_module_debug <- function(definition, title = '', width = 12L,
   }
   if(!length(output_id)){
     print(call)
-    raveutils::rave_fatal('Cannot find outputId for the above definition. Please specify keyword')
+    rave_fatal('Cannot find outputId for the above definition. Please specify keyword')
   }
 
 
   render_fun = substitute(render_fun)
   if(missing(render_fun)){
     # guess the update function
-    render_fun <- str2lang(raveutils::guess_shiny_output(call, parse = FALSE))
+    render_fun <- str2lang(guess_shiny_output(call, parse = FALSE))
   }
   watch_reactive <- c(list(quote(`{`)), lapply(watch_reactive, str2lang))
   watch_reactive <- as.call(watch_reactive)
@@ -296,13 +374,20 @@ define_output.rave_module_debug <- function(definition, title = '', width = 12L,
     output[[!!output_id]] <- !!call
   })
 
-  raveutils::rave_info('Renderer for output {sQuote(output_id)} ({title}):')
+  rave_info('Renderer for output {sQuote(output_id)} ({title}):')
   print(rlang::quo_squash(expr))
 
   invisible()
 }
 
 
+#' Customized shiny widget for 'RAVE' modules
+#' @description Wrapper for shiny \code{\link[shiny]{uiOutput}}
+#' @param inputId input ID used by \code{\link{define_input}},
+#' or output ID, used by \code{\link{define_output}}
+#' @param width width of the widget, used when it's output; see \code{width} in
+#' \code{\link{define_output}}
+#' @param ... passed to \code{\link[shiny]{uiOutput}}
 #' @export
 customizedUI <- function(inputId, width = 12L, ...){
   shiny::uiOutput(inputId, ...)
